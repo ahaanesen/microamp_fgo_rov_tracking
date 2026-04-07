@@ -23,9 +23,8 @@
 // Custom message types (replace with your actual message packages)
 #include "blueboat_interfaces/msg/gnss_nav_pvt.hpp"
 #include "blueboat_interfaces/msg/boat_state.hpp"
-#include "blueboat_interfaces/msg/usbl_measurement.hpp"
-#include "blueboat_interfaces/msg/acoustic_range.hpp"
-#include "blueboat_interfaces/msg/rov_depth.hpp"
+#include "blueboat_interfaces/msg/usbl.hpp"
+#include "blueboat_interfaces/msg/acoustic_comm_receive.hpp"
 #include "blueboat_interfaces/msg/rov_state.hpp"
 
 // NED conversion utility (your existing utility)
@@ -43,10 +42,8 @@ public:
   using Imu = sensor_msgs::msg::Imu;
   using GNSSNavPvt = blueboat_interfaces::msg::GNSSNavPvt;
   using BoatState = blueboat_interfaces::msg::BoatState;
-  using USBLMeasurement = blueboat_interfaces::msg::UsblMeasurement;
+  using USBLMessage = blueboat_interfaces::msg::Usbl;
   using AcousticCommReceive = blueboat_interfaces::msg::AcousticCommReceive;
-  // using AcousticRange = blueboat_interfaces::msg::AcousticRange;
-  // using ROVDepth = blueboat_interfaces::msg::ROVDepth;
   using ROVState = blueboat_interfaces::msg::ROVState;
 
   FactorGraphTrackingNode();
@@ -60,9 +57,8 @@ private:
   void publishBoatState(const gtsam::Values &est);
 
   // ==================== ROV STATE ====================
-  void usblCallback(const USBLMeasurement::SharedPtr msg);
-  void rangeCallback(const AcousticRange::SharedPtr msg);
-  void depthCallback(const ROVDepth::SharedPtr msg);
+  void usblCallback(const USBLMessage::SharedPtr msg);
+  void acousticCommCallback(const AcousticCommReceive::SharedPtr msg);
   void initializeROVState();
   void publishROVState(const gtsam::Values &est);
 
@@ -109,15 +105,6 @@ private:
   
   std::deque<ImuMeasurement> imu_buffer_; // Use a deque for efficient pushing to back and popping from front
   double max_imu_buffer_duration_ = 10.0; // seconds, adjust as needed
- 
-  struct PendingAcoustic {
-      double t_sent;
-      double t_received;
-      double depth;
-    double range;
-    double range_std;
-  };
-  std::map<uint32_t, PendingAcoustic> pending_data_; // Key: rov_id
 
   // ==================== ROV STATES ====================
   // bool rov_initialised_;
@@ -148,9 +135,8 @@ private:
   // ==================== ROS SUBSCRIPTIONS ====================
   rclcpp::Subscription<Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<GNSSNavPvt>::SharedPtr gnss_sub_;
-  rclcpp::Subscription<UsblMeasurement>::SharedPtr usbl_sub_;
-  rclcpp::Subscription<AcousticRange>::SharedPtr range_sub_;
-  rclcpp::Subscription<ROVDepth>::SharedPtr depth_sub_;
+  rclcpp::Subscription<Usbl>::SharedPtr usbl_sub_;
+  rclcpp::Subscription<AcousticCommReceive>::SharedPtr acoustic_comm_sub_;
 
   // ==================== ROS PUBLISHERS ====================
   rclcpp::Publisher<BoatState>::SharedPtr state_pub_;

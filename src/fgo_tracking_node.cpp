@@ -88,12 +88,12 @@ FactorGraphTrackingNode::FactorGraphTrackingNode()
   // ROS I/O — BOAT
   // ------------------------------------------------------------------
   imu_sub_ = create_subscription<Imu>(
-      "/imu/data", rclcpp::SensorDataQoS(),
+      "microampere/imu/data", rclcpp::SensorDataQoS(),
       std::bind(&FactorGraphTrackingNode::imuCallback, this,
                 std::placeholders::_1));
 
   gnss_sub_ = create_subscription<GNSSNavPvt>(
-      "/gnss/navpvt", 10,
+      "microampere/gnss/nav_pvt", 10,
       std::bind(&FactorGraphTrackingNode::gnssCallback, this,
                 std::placeholders::_1));
 
@@ -102,20 +102,16 @@ FactorGraphTrackingNode::FactorGraphTrackingNode()
   // ------------------------------------------------------------------
   // ROS I/O — ROV
   // ------------------------------------------------------------------
-  usbl_sub_ = create_subscription<UsblMeasurement>(
-      "/microampere/sensors/usbl", 10,
+  acoustic_comm_sub_ = create_subscription<AcousticCommReceive>(
+      "microampere/acoustic/receive", 10,
+      std::bind(&FactorGraphTrackingNode::acousticCommCallback, this,
+                std::placeholders::_1));
+  
+  usbl_sub_ = create_subscription<Usbl>(
+      "microampere/sensors/usbl", 10,
       std::bind(&FactorGraphTrackingNode::usblCallback, this,
                 std::placeholders::_1));
 
-  range_sub_ = create_subscription<AcousticRange>(
-      "/rov/range", 10,
-      std::bind(&FactorGraphTrackingNode::rangeCallback, this,
-                std::placeholders::_1));
-
-  depth_sub_ = create_subscription<ROVDepth>(
-      "/rov/depth", 10,
-      std::bind(&FactorGraphTrackingNode::depthCallback, this,
-                std::placeholders::_1));
 
   rov_state_pub_ = create_publisher<ROVState>("/state/rov", 10);
 
@@ -319,10 +315,10 @@ gtsam::Key FactorGraphTrackingNode::getAsvKeyAtTime(double target_time) {
 }
 
 // Helper function to generate unique keys per ROV
-// Encodes prefix (R=position, W=velocity), ROV ID, and time step into a single Key
-// Example: ROV position at time step 5 for ROV ID 2 -> getRovKey('R', 2, 5)
-gtsam::Key FactorGraphTrackingNode::getRovKey(unsigned char prefix, uint32_t rov_id, uint32_t time_step) {
-    uint64_t packed_index = (uint64_t(rov_id) << 32) | time_step;
+// Encodes prefix (R=position, W=velocity), ROV ID, and step count into a single Key
+// Example: ROV position at step 5 for ROV ID 2 -> getRovKey('R', 2, 5)
+gtsam::Key FactorGraphTrackingNode::getRovKey(unsigned char prefix, uint32_t rov_id, uint32_t step_count) {
+    uint64_t packed_index = (uint64_t(rov_id) << 32) | step_count;
     return gtsam::Symbol(prefix, packed_index);
 }
 
@@ -331,7 +327,7 @@ gtsam::Key FactorGraphTrackingNode::getRovKey(unsigned char prefix, uint32_t rov
 // ============================================================
 
 void FactorGraphTrackingNode::usblCallback(
-    const USBLMeasurement::SharedPtr msg) {
+    const USBLMessage::SharedPtr msg) {
   if (!graph_initialised_) {
     return;
   }
