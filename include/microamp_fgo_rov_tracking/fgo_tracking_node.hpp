@@ -95,23 +95,23 @@ private:
   rclcpp::Time last_imu_time_; 
   double last_gyro_z_ = 0.0; // Latest raw gyro z for yaw-rate output (bias correction applied later)
 
-  // ==================== ROV TRACKING ====================
- // IMU buffer for out of order handling for ROV measurements
+  // ==================== IMU buffer ====================
   struct IMUMeasurement {
     double timestamp;
     gtsam::Vector3 acc;
     gtsam::Vector3 gyro;
   };
-  
+
+   // IMU buffer for out of order handling for ROV measurements
   std::deque<ImuMeasurement> imu_buffer_; // Use a deque for efficient pushing to back and popping from front
   double max_imu_buffer_duration_ = 10.0; // seconds, adjust as needed
 
   // ==================== ROV STATES ====================
   // bool rov_initialised_;
   // rclcpp::Time last_rov_update_time_;
-  std::map<uint32_t, bool> rov_initialised_; // Maps ROV ID to its initialization status
-  std::map<uint32_t, uint32_t> rov_step_counters_; // Maps ROV ID to its current time step counter
-  std::map<uint32_t, double> last_rov_ts_; // Maps ROV ID to the timestamp of its last update
+  std::map<uint8_t, bool> rov_initialised_; // Maps ROV ID to its initialization status
+  std::map<uint8_t, uint32_t> rov_step_counters_; // Maps ROV ID to its current step counter
+  std::map<uint8_t, double> last_rov_timestamp_; // Maps ROV ID to the timestamp of its last update
 
   // ==================== PARAMETERS ====================
   // ASV IMU/GNSS
@@ -131,6 +131,7 @@ private:
 
   // USBL mounting offset (relative to ASV IMU frame)
   gtsam::Point3 usbl_offset_; // (x, y, z) in ASV body frame
+  gtsam::Rot3 usbl_rotation_; // Rotation from ASV body frame to USBL frame (if needed)
 
   // ==================== ROS SUBSCRIPTIONS ====================
   rclcpp::Subscription<Imu>::SharedPtr imu_sub_;
