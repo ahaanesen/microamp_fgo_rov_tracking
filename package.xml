@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>microamp_factor_graph</name>
+  <name>microamp_fgo_rov_tracking</name>
   <version>0.0.1</version>
   <description>iSAM2 factor graph using IMU + GNSS in NED</description>
-  <maintainer email="teodor.v.fossdal@ntnu.no">teodor</maintainer>
+  <maintainer email="antonia.h.aanesen@ntnu.no">Antonia</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
@@ -14,7 +14,7 @@
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>tf2_ros</depend>
-  <depend>microamp_interfaces</depend>
+  <depend>blueboat_interfaces</depend>
   <depend>gtsam</depend>
 
 
