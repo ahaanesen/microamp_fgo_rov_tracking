@@ -4,6 +4,7 @@
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/inference/Symbol.h>
 #include <gtsam/navigation/CombinedImuFactor.h>
+#include <gtsam/navigation/PreintegratedImuMeasurements.h>
 #include <gtsam/navigation/GPSFactor.h>
 #include <gtsam/navigation/ImuBias.h>
 #include <gtsam/nonlinear/ISAM2.h>
@@ -14,6 +15,7 @@
 
 #include <memory>
 #include <mutex>
+#include <deque>
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/imu.hpp"
@@ -31,27 +33,20 @@
 
 using gtsam::symbol_shorthand::B; // Bias  (b)
 using gtsam::symbol_shorthand::V; // Velocity (v)
-using gtsam::symbol_shorthand::X; // Pose (x)
+using gtsam::symbol_shorthand::X; // ASV Pose (x)
 
-// New symbols for ROV
-namespace gtsam {
-namespace symbol_shorthand {
-inline Key R(std::uint64_t j) { return Symbol('r', j); } // ROV position
-inline Key W(std::uint64_t j) { return Symbol('w', j); } // ROV velocity
-} // namespace symbol_shorthand
-} // namespace gtsam
-
-using gtsam::symbol_shorthand::R; // ROV position
-using gtsam::symbol_shorthand::W; // ROV velocity
+using gtsam::symbol_shorthand::R; // ROV Position (r)
+using gtsam::symbol_shorthand::W; // ROV Velocity (w)
 
 class FactorGraphTrackingNode : public rclcpp::Node {
 public:
   using Imu = sensor_msgs::msg::Imu;
   using GNSSNavPvt = blueboat_interfaces::msg::GNSSNavPvt;
   using BoatState = blueboat_interfaces::msg::BoatState;
-  using USBLMeasurement = blueboat_interfaces::msg::USBLMeasurement;
-  using AcousticRange = blueboat_interfaces::msg::AcousticRange;
-  using ROVDepth = blueboat_interfaces::msg::ROVDepth;
+  using USBLMeasurement = blueboat_interfaces::msg::UsblMeasurement;
+  using AcousticCommReceive = blueboat_interfaces::msg::AcousticCommReceive;
+  // using AcousticRange = blueboat_interfaces::msg::AcousticRange;
+  // using ROVDepth = blueboat_interfaces::msg::ROVDepth;
   using ROVState = blueboat_interfaces::msg::ROVState;
 
   FactorGraphTrackingNode();
@@ -71,6 +66,12 @@ private:
   void initializeROVState();
   void publishROVState(const gtsam::Values &est);
 
+  // ==================== HELPERS ====================
+  gtsam::PreintegratedImuMeasurements getPimFromBuffer(double t_start, double t_end);
+  gtsam::Key getAsvKeyAtTime(double target_time);
+  gtsam::Key getRovKey(unsigned char prefix, uint32_t rov_id, uint32_t time_step);
+
+
   // ==================== SHARED ====================
   gtsam::Values updateAndGetEstimate();
 
@@ -79,6 +80,11 @@ private:
   gtsam::NonlinearFactorGraph graph_;
   gtsam::Values values_;
   std::mutex graph_mutex_;
+  
+  std::map<double, gtsam::Key> asv_timeline_; // Maps timestamp (seconds) to the GTSAM Key for the ASV
+  uint64_t asv_index_ = 0; // Counter for the ASV symbol index
+  double last_asv_timestamp_ = -1.0; // The timestamp of the very last ASV node added to the graph
+
 
   // ==================== ASV NAVIGATION ====================
   std::unique_ptr<gtsam::PreintegratedCombinedMeasurements> pim_;
@@ -90,38 +96,35 @@ private:
   bool graph_initialised_;
   bool imu_initialised_ = false;
 
-  uint64_t key_; // Shared timestep counter for both ASV and ROV
+  rclcpp::Time last_imu_time_; 
+  double last_gyro_z_ = 0.0; // Latest raw gyro z for yaw-rate output (bias correction applied later)
 
-  rclcpp::Time last_imu_time_;
-  double last_gyro_z_ = 0.0;
-
-  // ==================== ROV STATE ====================
-  bool rov_initialised_;
-  rclcpp::Time last_rov_update_time_;
-
-  // ROV sensor buffers (for temporal alignment)
-  struct USBLBuffer {
-    rclcpp::Time stamp;
-    double azimuth;
-    double elevation;
-    double azimuth_std;
-    double elevation_std;
+  // ==================== ROV TRACKING ====================
+ // IMU buffer for out of order handling for ROV measurements
+  struct IMUMeasurement {
+    double timestamp;
+    gtsam::Vector3 acc;
+    gtsam::Vector3 gyro;
   };
-  std::optional<USBLBuffer> pending_usbl_;
-
-  struct RangeBuffer {
-    rclcpp::Time stamp;
+  
+  std::deque<ImuMeasurement> imu_buffer_; // Use a deque for efficient pushing to back and popping from front
+  double max_imu_buffer_duration_ = 10.0; // seconds, adjust as needed
+ 
+  struct PendingAcoustic {
+      double t_sent;
+      double t_received;
+      double depth;
     double range;
     double range_std;
   };
-  std::optional<RangeBuffer> pending_range_;
+  std::map<uint32_t, PendingAcoustic> pending_data_; // Key: rov_id
 
-  struct DepthBuffer {
-    rclcpp::Time stamp;
-    double depth;
-    double depth_std;
-  };
-  std::optional<DepthBuffer> pending_depth_;
+  // ==================== ROV STATES ====================
+  // bool rov_initialised_;
+  // rclcpp::Time last_rov_update_time_;
+  std::map<uint32_t, bool> rov_initialised_; // Maps ROV ID to its initialization status
+  std::map<uint32_t, uint32_t> rov_step_counters_; // Maps ROV ID to its current time step counter
+  std::map<uint32_t, double> last_rov_ts_; // Maps ROV ID to the timestamp of its last update
 
   // ==================== PARAMETERS ====================
   // ASV IMU/GNSS
@@ -145,7 +148,7 @@ private:
   // ==================== ROS SUBSCRIPTIONS ====================
   rclcpp::Subscription<Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<GNSSNavPvt>::SharedPtr gnss_sub_;
-  rclcpp::Subscription<USBLMeasurement>::SharedPtr usbl_sub_;
+  rclcpp::Subscription<UsblMeasurement>::SharedPtr usbl_sub_;
   rclcpp::Subscription<AcousticRange>::SharedPtr range_sub_;
   rclcpp::Subscription<ROVDepth>::SharedPtr depth_sub_;
 
