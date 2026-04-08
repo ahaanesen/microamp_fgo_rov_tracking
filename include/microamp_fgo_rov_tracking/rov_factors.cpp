@@ -6,8 +6,14 @@
 using namespace std;
 using namespace gtsam;
 
+inline double wrapToPi(double angle) {
+    while (angle > M_PI) angle -= 2.0 * M_PI;
+    while (angle < -M_PI) angle += 2.0 * M_PI;
+    return angle;
+}
 
-class UsblFactor : public NoiseModelFactor2<NavState, Point3> {
+
+class UsblFactor : public NoiseModelFactor2<Pose3, Point3> {
 private:
     double measuredAzimuth_; // Measured azimuth from USBL (degrees)
     double measuredElevation_; // Measured elevation from USBL (degrees)
@@ -23,14 +29,14 @@ public:
                 double measuredElevation,
                 const gtsam::Pose3& body_P_sensor,
                 const SharedNoiseModel& model)
-        : NoiseModelFactor2<NavState, Point3>(model, asvKey, rovKey),
+        : NoiseModelFactor2<Pose3, Point3>(model, asvKey, rovKey),
           measuredAzimuth_(measuredAzimuth), measuredElevation_(measuredElevation),
           body_P_sensor_(body_P_sensor) {}
 
     ~UsblFactor() override {}
 
     Vector evaluateError(
-        const gtsam::NavState& asvState,
+        const gtsam::Pose3& asvPose,
         const gtsam::Point3& rovPoint,
         boost::optional<gtsam::Matrix&> H_asv = boost::none,
         boost::optional<gtsam::Matrix&> H_rov = boost::none) const override
@@ -43,7 +49,7 @@ public:
         // 1. Get the Sensor Pose in World Frame
         //      Note: H_comp is the Jacobian of the composition
         gtsam::Matrix66 H_pose_asv; 
-        gtsam::Pose3 world_P_sensor = asvState.pose().compose(body_P_sensor_, H_asv ? &H_pose_asv : nullptr);
+        gtsam::Pose3 world_P_sensor = asvPose.compose(body_P_sensor_, H_asv ? &H_pose_asv : nullptr);
 
         // 2. Transform ROV point into Sensor Local Frame
         gtsam::Matrix36 H_local_sensor; // d(P_local) / d(SensorPose)
@@ -57,35 +63,47 @@ public:
         double r2 = x*x + y*y;
         double r = std::sqrt(r2);
         double rho2 = r2 + z*z;
+        const double epsilon = 1e-6; // Small value to avoid division by zero
+
 
         double expAz = std::atan2(y, x);
         if (expAz < 0.0) { expAz += 2.0 * M_PI; } // Convert to [0, 2pi) for correct comparison with measured azimuth
         double expEl = std::atan2(z, r);
 
+        double errAz = wrapToPi(expAz - measAzimuthRad);
+        double errEl = expEl - measElevationRad;
+
         // 4. Handle Jacobians via Chain Rule
+        gtsam::Matrix23 H_angles_local = gtsam::Matrix23::Zero(); // d([az, el]) / d(P_local)
+        if (r2 > epsilon && r > epsilon && rho2 > epsilon) {
+            H_angles_local << -y/r2,            x/r2,           0.0,
+                              -x*z/(rho2 * r), -y*z/(rho2 * r), r/rho2;
+        }
+
         if (H_asv) {
             // Jacobian of [az, el] w.r.t P_local
             gtsam::Matrix23 H_angles_local;
             H_angles_local << -y/r2,            x/r2,           0.0,
                               -x*z/(rho2 * r), -y*z/(rho2 * r), r/rho2;
 
-            // d(angles)/d(NavState) = d(angles)/d(P_local) * d(P_local)/d(SensorPose) * d(SensorPose)/d(AsvPose)
-            // NavState has 9 DOF: [Rot, Pos, Vel]. Vel derivatives are 0.
-            gtsam::Matrix29 H_total = gtsam::Matrix::Zero(2, 9);
-            H_total.block<2, 6>(0, 0) = H_angles_local * H_local_sensor * H_pose_asv;
+            gtsam::Matrix26 H_total = H_angles_local * H_local_sensor * H_pose_asv;
             *H_asv = H_total;
         }
 
         if (H_rov) {
-            gtsam::Matrix23 H_angles_local;
-            H_angles_local << -y/r2,            x/r2,           0.0,
-                              -x*z/(rho2 * r), -y*z/(rho2 * r), r/rho2;
-            
             *H_rov = H_angles_local * H_local_rov;
         }
 
-        return (gtsam::Vector(2) << (expAz - measAzimuthRad), (expEl - measElevationRad)).finished();
+
+        return (gtsam::Vector(2) << errAz, errEl).finished();
     }
+
+    // Clone function to allow copying of the factor
+    gtsam::NonlinearFactor::shared_ptr clone() const override {
+        return std::static_pointer_cast<gtsam::NonlinearFactor>(
+            gtsam::NonlinearFactor::shared_ptr(new UsblFactor(*this)));
+    }
+    
 };
 
 class DepthFactor : public NoiseModelFactor1<Point3> {
@@ -122,7 +140,7 @@ public:
 };
 
 
-class PsudoRangeFactor : public NoiseModelFactor2<gtam::NavState, gtsm::Point3> {
+class PsudoRangeFactor : public NoiseModelFactor2<gtsam::Pose3, gtsam::Point3> {
 private:
     double measuredTOF_;
     double soundSpeed_;
@@ -133,24 +151,25 @@ public:
     typedef std::shared_ptr<PsudoRangeFactor> shared_ptr;
 
     PsudoRangeFactor(Key asvKey,
-                      Key rovKey,
-                      double tof,
-                      double v_sound,
-                      const SharedNoiseModel& model)
-        : NoiseModelFactor2<NavState, Point3>(model, asvKey, rovKey),
-          measuredTOF_(tof), soundSpeed_(v_sound) {}
+                    Key rovKey,
+                    double tof,
+                    double v_sound,
+                    const gtsam::Pose3& body_P_sensor,
+                    const SharedNoiseModel& model)
+        : NoiseModelFactor2<gtsam::Pose3, gtsam::Point3>(model, asvKey, rovKey),
+          measuredTOF_(tof), soundSpeed_(v_sound), body_P_sensor_(body_P_sensor) {}
 
     ~PsudoRangeFactor() override {}
 
     Vector evaluateError(
-        const gtsam::NavState& asvPose,
-        const gtsam::Point3& landmark,
+        const gtsam::Pose3& asvPose,
+        const gtsam::Point3& rovPoint,
         boost::optional<gtsam::Matrix&> H_asv = boost::none,
         boost::optional<gtsam::Matrix&> H_rov = boost::none) const override
     {
         // 1. Position of USBL sensor in world frame
         gtsam::Matrix66 H_pose_asv;
-        gtsam::Pose3 world_P_sensor = asvState.pose().compose(body_P_sensor_, H_asv ? &H_pose_asv : nullptr);
+        gtsam::Pose3 world_P_sensor = asvPose.compose(body_P_sensor_, H_asv ? &H_pose_asv : nullptr);
 
         // 2. Distance from sensor to ROV
         gtsam::Matrix16 H_dist_sensor; // d(dist)/d(sensorPose)
@@ -163,10 +182,7 @@ public:
 
         // 3. Chain Rule for Jacobians
         if (H_asv) {
-            // H_asv must be 1x9. Velocity parts (indices 6-8) are zero.
-            gtsam::Matrix19 H_total = gtsam::Matrix::Zero(1, 9);
-            H_total.block<1, 6>(0, 0) = (1.0 / soundSpeed_) * H_dist_sensor * H_pose_asv;
-            *H_asv = H_total;
+            *H_asv = (1.0 / soundSpeed_) * H_dist_sensor * H_pose_asv; // 1x6
         }
 
         if (H_rov) {
@@ -177,6 +193,11 @@ public:
         return (gtsam::Vector(1) << expectedTOF - measuredTOF_).finished();
     }
 
+    // Clone function to allow copying of the factor
+    gtsam::NonlinearFactor::shared_ptr clone() const override {
+        return std::static_pointer_cast<gtsam::NonlinearFactor>(
+            gtsam::NonlinearFactor::shared_ptr(new PsudoRangeFactor(*this)));
+    }
 };
 
 class ConstantVelocityFactor : public gtsam::NoiseModelFactor3<gtsam::Point3, gtsam::Vector3, gtsam::Point3> {
@@ -198,5 +219,11 @@ public:
         if (H3) *H3 = -gtsam::Matrix33::Identity();          // d_err/d_pnext
 
         return (p_t + v_t * dt_) - p_next;
+    }
+
+    // Clone function to allow copying of the factor
+    gtsam::NonlinearFactor::shared_ptr clone() const override {
+        return std::static_pointer_cast<gtsam::NonlinearFactor>(
+            gtsam::NonlinearFactor::shared_ptr(new ConstantVelocityFactor(*this)));
     }
 };

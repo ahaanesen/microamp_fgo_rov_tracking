@@ -4,7 +4,7 @@
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/inference/Symbol.h>
 #include <gtsam/navigation/CombinedImuFactor.h>
-#include <gtsam/navigation/PreintegratedImuMeasurements.h>
+#include <gtsam/navigation/PreintegratedCombinedMeasurements.h>
 #include <gtsam/navigation/GPSFactor.h>
 #include <gtsam/navigation/ImuBias.h>
 #include <gtsam/nonlinear/ISAM2.h>
@@ -42,7 +42,7 @@ public:
   using Imu = sensor_msgs::msg::Imu;
   using GNSSNavPvt = blueboat_interfaces::msg::GNSSNavPvt;
   using BoatState = blueboat_interfaces::msg::BoatState;
-  using USBLMessage = blueboat_interfaces::msg::Usbl;
+  using USBLMessage = blueboat_interfaces::msg::USBL;
   using AcousticCommReceive = blueboat_interfaces::msg::AcousticCommReceive;
   using ROVState = blueboat_interfaces::msg::ROVState;
 
@@ -59,11 +59,11 @@ private:
   // ==================== ROV STATE ====================
   void usblCallback(const USBLMessage::SharedPtr msg);
   void acousticCommCallback(const AcousticCommReceive::SharedPtr msg);
-  void initializeROVState();
+  void initializeNewRov(uint8_t rov_id, Key rKey, Key wKey, const USBLMessage::SharedPtr& usbl, double speed_of_sound);
   void publishROVState(const gtsam::Values &est);
 
   // ==================== HELPERS ====================
-  gtsam::PreintegratedImuMeasurements getPimFromBuffer(double t_start, double t_end);
+  gtsam::PreintegratedCombinedMeasurements getPimFromBuffer(double t_start, double t_end);
   gtsam::Key getAsvKeyAtTime(double target_time);
   gtsam::Key getRovKey(unsigned char prefix, uint32_t rov_id, uint32_t time_step);
 
@@ -96,7 +96,7 @@ private:
   double last_gyro_z_ = 0.0; // Latest raw gyro z for yaw-rate output (bias correction applied later)
 
   // ==================== IMU buffer ====================
-  struct IMUMeasurement {
+  struct ImuMeasurement {
     double timestamp;
     gtsam::Vector3 acc;
     gtsam::Vector3 gyro;
@@ -107,8 +107,6 @@ private:
   double max_imu_buffer_duration_ = 10.0; // seconds, adjust as needed
 
   // ==================== ROV STATES ====================
-  // bool rov_initialised_;
-  // rclcpp::Time last_rov_update_time_;
   std::map<uint8_t, bool> rov_initialised_; // Maps ROV ID to its initialization status
   std::map<uint8_t, uint32_t> rov_step_counters_; // Maps ROV ID to its current step counter
   std::map<uint8_t, double> last_rov_timestamp_; // Maps ROV ID to the timestamp of its last update
@@ -136,7 +134,7 @@ private:
   // ==================== ROS SUBSCRIPTIONS ====================
   rclcpp::Subscription<Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<GNSSNavPvt>::SharedPtr gnss_sub_;
-  rclcpp::Subscription<Usbl>::SharedPtr usbl_sub_;
+  rclcpp::Subscription<USBLMessage>::SharedPtr usbl_sub_;
   rclcpp::Subscription<AcousticCommReceive>::SharedPtr acoustic_comm_sub_;
 
   // ==================== ROS PUBLISHERS ====================
