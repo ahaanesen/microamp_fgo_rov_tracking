@@ -10,7 +10,7 @@ struct TopicsConfig {
   std::string acoustic_rx{"microampere/acoustic/receive"};
   std::string boat_state_pub{"/state/boat"};
   std::string rov_state_pub{"/state/rov"};
-+};
+};
 
 struct EnvConfig {
     double gravity{9.82145996};

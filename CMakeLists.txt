@@ -25,7 +25,8 @@ find_package(Eigen3 REQUIRED)
 add_executable(fgo_tracking_node 
   src/fgo_tracking_node.cpp
   src/config.cpp
-  rov_factors.cpp)
+  src/rov_factors.cpp
+)
 
 # ament_target_dependencies uses CMake's plain (non-keyword) signature
 # internally. All target_link_libraries calls on the same target must use the
