@@ -1,0 +1,9 @@
+microamp_factor_graph_tracking:
+  ros__parameters:
+    topics:
+      imu: "microampere/imu/data"
+      gnss: "microampere/gnss/nav_pvt"
+      usbl: "microampere/sensors/usbl"
+      acoustic_rx: "microampere/acoustic/receive"
+      boat_state_pub: "/state/boat"
+      rov_state_pub: "/state/rov"

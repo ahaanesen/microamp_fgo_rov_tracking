@@ -27,8 +27,8 @@
 #include "blueboat_interfaces/msg/acoustic_comm_receive.hpp"
 #include "blueboat_interfaces/msg/rov_state.hpp"
 
-// NED conversion utility (your existing utility)
 #include "ned_converter.hpp"
+#include "config.hpp"
 
 using gtsam::symbol_shorthand::B; // Bias  (b)
 using gtsam::symbol_shorthand::V; // Velocity (v)
@@ -49,11 +49,14 @@ public:
   FactorGraphTrackingNode();
 
 private:
+  // ==================== INITIALIZATION & CONFIG ====================
+  void loadConfigurations();
+  void initializeGraph();
+  void initializeDatumFromGNSS(const GNSSNavPvt &msg);
+
   // ==================== ASV STATE ====================
   void imuCallback(const Imu::SharedPtr msg);
   void gnssCallback(const GNSSNavPvt::SharedPtr msg);
-  void initializeDatumFromGNSS(const GNSSNavPvt &msg);
-  void initializeGraph();
   void publishBoatState(const gtsam::Values &est);
 
   // ==================== ROV STATE ====================
@@ -62,16 +65,14 @@ private:
   void initializeNewRov(uint8_t rov_id, Key rKey, Key wKey, const USBLMessage::SharedPtr& usbl, double speed_of_sound);
   void publishROVState(const gtsam::Values &est);
 
-  // ==================== HELPERS ====================
+  // ==================== KEY HELPERS ====================
   gtsam::PreintegratedCombinedMeasurements getPimFromBuffer(double t_start, double t_end);
   gtsam::Key getAsvKeyAtTime(double target_time);
   gtsam::Key getRovKey(unsigned char prefix, uint32_t rov_id, uint32_t time_step);
 
-
-  // ==================== SHARED ====================
+  // ==================== GTSAM CORE ====================
   gtsam::Values updateAndGetEstimate();
 
-  // ==================== GTSAM CORE ====================
   gtsam::ISAM2 isam2_;
   gtsam::NonlinearFactorGraph graph_;
   gtsam::Values values_;
@@ -81,6 +82,9 @@ private:
   uint64_t asv_index_ = 0; // Counter for the ASV symbol index
   double last_asv_timestamp_ = -1.0; // The timestamp of the very last ASV node added to the graph
 
+  std::map<uint8_t, bool> rov_initialised_; // Maps ROV ID to its initialization status
+  std::map<uint8_t, uint32_t> rov_step_counters_; // Maps ROV ID to its current step counter
+  std::map<uint8_t, double> last_rov_timestamp_; // Maps ROV ID to the timestamp of its last update
 
   // ==================== ASV NAVIGATION ====================
   std::unique_ptr<gtsam::PreintegratedCombinedMeasurements> pim_;
@@ -106,30 +110,10 @@ private:
   std::deque<ImuMeasurement> imu_buffer_; // Use a deque for efficient pushing to back and popping from front
   double max_imu_buffer_duration_ = 10.0; // seconds, adjust as needed
 
-  // ==================== ROV STATES ====================
-  std::map<uint8_t, bool> rov_initialised_; // Maps ROV ID to its initialization status
-  std::map<uint8_t, uint32_t> rov_step_counters_; // Maps ROV ID to its current step counter
-  std::map<uint8_t, double> last_rov_timestamp_; // Maps ROV ID to the timestamp of its last update
-
   // ==================== PARAMETERS ====================
-  // ASV IMU/GNSS
-  double accel_noise_, gyro_noise_;
-  double accel_rw_, gyro_rw_;
-  double prior_pose_sigma_, prior_vel_sigma_, prior_bias_sigma_;
-  double gps_sigma_floor_, gps_sigma_max_;
-
-  // ROV
-  double rov_prior_pos_sigma_;
-  double rov_prior_vel_sigma_;
-  double rov_process_vel_sigma_; // Constant velocity model noise
-  double usbl_azimuth_sigma_;
-  double usbl_elevation_sigma_;
-  double acoustic_range_sigma_;
-  double rov_depth_sigma_;
-
-  // USBL mounting offset (relative to ASV IMU frame)
-  gtsam::Point3 usbl_offset_; // (x, y, z) in ASV body frame
-  gtsam::Rot3 usbl_rotation_; // Rotation from ASV body frame to USBL frame (if needed)
+  EnvConfig env_config_;
+  FgoConfig fgo_config_;
+  TopicsConfig topics_config_;
 
   // ==================== ROS SUBSCRIPTIONS ====================
   rclcpp::Subscription<Imu>::SharedPtr imu_sub_;

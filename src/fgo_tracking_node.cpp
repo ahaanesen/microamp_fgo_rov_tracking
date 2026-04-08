@@ -1,5 +1,6 @@
 #include "microamp_fgo_rov_tracking/fgo_tracking_node.hpp"
-#include "microamp_fgo_rov_tracking/rov_factors.cpp"
+#include "microamp_fgo_rov_tracking/rov_factors.hpp"
+#include "microamp_fgo_rov_tracking/config.hpp"
 
 #include <gtsam/geometry/Point3.h>
 #include <gtsam/nonlinear/NonlinearFactor.h>
@@ -14,71 +15,20 @@ FactorGraphTrackingNode::FactorGraphTrackingNode()
     : Node("microamp_factor_graph_tracking"), isam2_(gtsam::ISAM2Params()),
       gravity_(9.82145996), datum_initialised_(false),
       graph_initialised_(false), asv_index_(0) {
-
-  // ------------------------------------------------------------------
-  // ROS parameters — BOAT
-  // ------------------------------------------------------------------
-  declare_parameter("accel_noise", 1e-2);
-  declare_parameter("gyro_noise", 1e-3);
-  declare_parameter("accel_rw", 1e-4);
-  declare_parameter("gyro_rw", 1e-5);
-  declare_parameter("prior_pose_sigma", 1e-2);
-  declare_parameter("prior_vel_sigma", 1e-2);
-  declare_parameter("prior_bias_sigma", 1e-3);
-  declare_parameter("gps_sigma_floor", 0.5);
-  declare_parameter("gps_sigma_max", 50.0);
-
-  accel_noise_ = get_parameter("accel_noise").as_double();
-  gyro_noise_ = get_parameter("gyro_noise").as_double();
-  accel_rw_ = get_parameter("accel_rw").as_double();
-  gyro_rw_ = get_parameter("gyro_rw").as_double();
-  prior_pose_sigma_ = get_parameter("prior_pose_sigma").as_double();
-  prior_vel_sigma_ = get_parameter("prior_vel_sigma").as_double();
-  prior_bias_sigma_ = get_parameter("prior_bias_sigma").as_double();
-  gps_sigma_floor_ = get_parameter("gps_sigma_floor").as_double();
-  gps_sigma_max_ = get_parameter("gps_sigma_max").as_double();
-
-  // ------------------------------------------------------------------
-  // ROS parameters — ROV
-  // ------------------------------------------------------------------
-  declare_parameter("rov_prior_pos_sigma", 10.0);   // metres
-  declare_parameter("rov_prior_vel_sigma", 1.0);    // m/s
-  declare_parameter("rov_process_vel_sigma", 0.5);  // constant-vel noise m/s
-  declare_parameter("usbl_azimuth_sigma", 0.05);    // radians (~3 deg)
-  declare_parameter("usbl_elevation_sigma", 0.05);  // radians
-  declare_parameter("acoustic_range_sigma", 1.0);   // metres
-  declare_parameter("rov_depth_sigma", 0.2);        // metres
-
-  // USBL sensor offset (x, y, z) in boat body frame
-  declare_parameter("usbl_offset_x", 0.0);
-  declare_parameter("usbl_offset_y", 0.0);
-  declare_parameter("usbl_offset_z", 1.5); // 1.5m below boat IMU
-
-  rov_prior_pos_sigma_ = get_parameter("rov_prior_pos_sigma").as_double();
-  rov_prior_vel_sigma_ = get_parameter("rov_prior_vel_sigma").as_double();
-  rov_process_vel_sigma_ = get_parameter("rov_process_vel_sigma").as_double();
-  usbl_azimuth_sigma_ = get_parameter("usbl_azimuth_sigma").as_double();
-  usbl_elevation_sigma_ = get_parameter("usbl_elevation_sigma").as_double();
-  acoustic_range_sigma_ = get_parameter("acoustic_range_sigma").as_double();
-  rov_depth_sigma_ = get_parameter("rov_depth_sigma").as_double();
-
-  double ux = get_parameter("usbl_offset_x").as_double();
-  double uy = get_parameter("usbl_offset_y").as_double();
-  double uz = get_parameter("usbl_offset_z").as_double();
-  usbl_offset_ = gtsam::Point3(ux, uy, uz);
-  usbl_rotation_ = gtsam::Rot3::RzRyRx(0.0, 0.0, 0.0); // No rotation between boat body frame and USBL frame in this example, adjust if needed
+  
+  loadConfigurations();
 
   // ------------------------------------------------------------------
   // IMU Preintegration (NED)
   // ------------------------------------------------------------------
   auto params =
-      gtsam::PreintegratedCombinedMeasurements::Params::MakeSharedD(gravity_);
+      gtsam::PreintegratedCombinedMeasurements::Params::MakeSharedD(env_config_.gravity);
 
-  params->accelerometerCovariance = accel_noise_ * accel_noise_ * gtsam::I_3x3;
-  params->gyroscopeCovariance = gyro_noise_ * gyro_noise_ * gtsam::I_3x3;
+  params->accelerometerCovariance = fgo_config_.accel_noise * fgo_config_.accel_noise * gtsam::I_3x3;
+  params->gyroscopeCovariance = fgo_config_.gyro_noise * fgo_config_.gyro_noise * gtsam::I_3x3;
   params->integrationCovariance = 1e-8 * gtsam::I_3x3;
-  params->biasAccCovariance = accel_rw_ * accel_rw_ * gtsam::I_3x3;
-  params->biasOmegaCovariance = gyro_rw_ * gyro_rw_ * gtsam::I_3x3;
+  params->biasAccCovariance = fgo_config_.accel_rw * fgo_config_.accel_rw * gtsam::I_3x3;
+  params->biasOmegaCovariance = fgo_config_.gyro_rw * fgo_config_.gyro_rw * gtsam::I_3x3;
   params->biasAccOmegaInt = 1e-3 * gtsam::I_6x6;
 
   bias_ = gtsam::imuBias::ConstantBias();
@@ -89,38 +39,44 @@ FactorGraphTrackingNode::FactorGraphTrackingNode()
   // ROS I/O — BOAT
   // ------------------------------------------------------------------
   imu_sub_ = create_subscription<Imu>(
-      "microampere/imu/data", rclcpp::SensorDataQoS(),
+      topics_cfg_.imu, rclcpp::SensorDataQoS(),
       std::bind(&FactorGraphTrackingNode::imuCallback, this,
                 std::placeholders::_1));
 
   gnss_sub_ = create_subscription<GNSSNavPvt>(
-      "microampere/gnss/nav_pvt", 10,
+      topics_cfg_.gnss, 10,
       std::bind(&FactorGraphTrackingNode::gnssCallback, this,
                 std::placeholders::_1));
 
-  state_pub_ = create_publisher<BoatState>("/state/boat", 10);
+  state_pub_ = create_publisher<BoatState>(topics_cfg_.boat_state_pub, 10);
 
   // ------------------------------------------------------------------
   // ROS I/O — ROV
   // ------------------------------------------------------------------
   acoustic_comm_sub_ = create_subscription<AcousticCommReceive>(
-      "microampere/acoustic/receive", 10,
+      topics_cfg_.acoustic_rx, 10,
       std::bind(&FactorGraphTrackingNode::acousticCommCallback, this,
                 std::placeholders::_1));
   
   usbl_sub_ = create_subscription<USBLMessage>(
-      "microampere/sensors/usbl", 10,
+      topics_cfg_.usbl, 10,
       std::bind(&FactorGraphTrackingNode::usblCallback, this,
                 std::placeholders::_1));
 
 
-  rov_state_pub_ = create_publisher<ROVState>("/state/rov", 10);
+  rov_state_pub_ = create_publisher<ROVState>(topics_cfg_.rov_state_pub, 10);
 
   RCLCPP_INFO(get_logger(), "Expanded factor graph node initialized.");
 }
 
+void FactorGraphTrackingNode::loadConfigs() {
+  declareAndLoadTopics(*this, topics_cfg_);
+  declareAndLoadEnv(*this, env_cfg_);
+  declareAndLoadFgo(*this, fgo_cfg_);
+}
+
 // ============================================================
-// BOAT CALLBACKS (same as original)
+// ASV CALLBACKS
 // ============================================================
 
 void FactorGraphTrackingNode::imuCallback(const Imu::SharedPtr msg) {
@@ -332,7 +288,7 @@ void FactorGraphTrackingNode::usblCallback(
   }
 
   uint8_t rov_id = msg->rov_id;
-  double sound_speed = 1500.0; // Speed of sound in water (m/s), adjust if needed
+  double sound_speed = env_cfg_.sound_speed;
   double t_sent = msg->t_sent;
   double t_received = msg->t_received;
 
@@ -414,7 +370,7 @@ void FactorGraphTrackingNode::acousticCommCallback(
   }
 
   uint8_t rov_id = msg->rov_id;
-  double sound_speed = 1500.0; // Speed of sound in water (m/s), adjust if needed
+  double sound_speed = env_cfg_.sound_speed;
   double t_sent = msg->t_sent;
   double t_received = msg->t_received;
 
@@ -485,7 +441,6 @@ void FactorGraphTrackingNode::acousticCommCallback(
 // ROV INITIALIZATION
 // ============================================================
 
-// TODO: check logic
 void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKey, 
                                                const USBLMessage::SharedPtr& usbl,
                                                double speed_of_sound) {
@@ -638,6 +593,10 @@ void FactorGraphTrackingNode::publishROVState(const gtsam::Values &est) {
   }
 }
 
+
+// ============================================================
+// MAIN
+// ============================================================
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
   rclcpp::spin(std::make_shared<FactorGraphTrackingNode>());

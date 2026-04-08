@@ -3,6 +3,8 @@
 #include <gtsam/nonlinear/NonlinearFactor.h>
 #include <gtsam/navigation/NavState.h>
 
+#include "microamp_fgo_rov_tracking/rov_factors.hpp"
+
 using namespace std;
 using namespace gtsam;
 
