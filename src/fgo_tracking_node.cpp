@@ -8,72 +8,74 @@
 
 
 // ============================================================
-// CONSTRUCTOR
+// CONSTRUCTOR, DESTRUCTOR, AND INITIALIZATION
 // ============================================================
 
 FactorGraphTrackingNode::FactorGraphTrackingNode()
     : Node("microamp_factor_graph_tracking"), isam2_(gtsam::ISAM2Params()),
-      gravity_(9.82145996), datum_initialised_(false),
-      graph_initialised_(false), asv_index_(0) {
+      graph_initialised_(false), asv_index_(0), datum_initialised_(false) {
   
   loadConfigurations();
 
   // ------------------------------------------------------------------
   // IMU Preintegration (NED)
   // ------------------------------------------------------------------
-  auto params =
-      gtsam::PreintegratedCombinedMeasurements::Params::MakeSharedD(env_config_.gravity);
+  pim_params_ =
+    gtsam::PreintegratedCombinedMeasurements::Params::MakeSharedD(env_config_.gravity);
 
-  params->accelerometerCovariance = fgo_config_.accel_noise * fgo_config_.accel_noise * gtsam::I_3x3;
-  params->gyroscopeCovariance = fgo_config_.gyro_noise * fgo_config_.gyro_noise * gtsam::I_3x3;
-  params->integrationCovariance = 1e-8 * gtsam::I_3x3;
-  params->biasAccCovariance = fgo_config_.accel_rw * fgo_config_.accel_rw * gtsam::I_3x3;
-  params->biasOmegaCovariance = fgo_config_.gyro_rw * fgo_config_.gyro_rw * gtsam::I_3x3;
-  params->biasAccOmegaInt = 1e-3 * gtsam::I_6x6;
+
+  pim_params_->accelerometerCovariance = fgo_config_.accel_noise * fgo_config_.accel_noise * gtsam::I_3x3;
+  pim_params_->gyroscopeCovariance = fgo_config_.gyro_noise * fgo_config_.gyro_noise * gtsam::I_3x3;
+  pim_params_->integrationCovariance = 1e-8 * gtsam::I_3x3;
+  pim_params_->biasAccCovariance = fgo_config_.accel_rw * fgo_config_.accel_rw * gtsam::I_3x3;
+  pim_params_->biasOmegaCovariance = fgo_config_.gyro_rw * fgo_config_.gyro_rw * gtsam::I_3x3;
+  pim_params_->biasAccOmegaInt = 1e-3 * gtsam::I_6x6;
 
   bias_ = gtsam::imuBias::ConstantBias();
-  pim_ =
-      std::make_unique<gtsam::PreintegratedCombinedMeasurements>(params, bias_);
+  pim_ = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(pim_params_, bias_);
 
   // ------------------------------------------------------------------
   // ROS I/O — BOAT
   // ------------------------------------------------------------------
-  imu_sub_ = create_subscription<Imu>(
-      topics_cfg_.imu, rclcpp::SensorDataQoS(),
+
+  imu_sub_ = this->create_subscription<Imu>(
+      topics_config_.imu, rclcpp::SensorDataQoS(),
       std::bind(&FactorGraphTrackingNode::imuCallback, this,
                 std::placeholders::_1));
 
-  gnss_sub_ = create_subscription<GNSSNavPvt>(
-      topics_cfg_.gnss, 10,
+  gnss_sub_ = this->create_subscription<GNSSNavPvt>(
+      topics_config_.gnss, 10,
       std::bind(&FactorGraphTrackingNode::gnssCallback, this,
                 std::placeholders::_1));
 
-  state_pub_ = create_publisher<BoatState>(topics_cfg_.boat_state_pub, 10);
+  state_pub_ = this->create_publisher<BoatState>(topics_config_.boat_state_pub, 10);
 
   // ------------------------------------------------------------------
   // ROS I/O — ROV
   // ------------------------------------------------------------------
-  acoustic_comm_sub_ = create_subscription<AcousticCommReceive>(
-      topics_cfg_.acoustic_rx, 10,
+  acoustic_comm_sub_ = this->create_subscription<AcousticCommReceive>(
+      topics_config_.acoustic_rx, 10,
       std::bind(&FactorGraphTrackingNode::acousticCommCallback, this,
                 std::placeholders::_1));
   
-  usbl_sub_ = create_subscription<USBLMessage>(
-      topics_cfg_.usbl, 10,
+  usbl_sub_ = this->create_subscription<USBLMessage>(
+      topics_config_.usbl, 10,
       std::bind(&FactorGraphTrackingNode::usblCallback, this,
                 std::placeholders::_1));
 
 
-  rov_state_pub_ = create_publisher<ROVState>(topics_cfg_.rov_state_pub, 10);
+  rov_state_pub_ = this->create_publisher<ROVState>(topics_config_.rov_state_pub, 10);
 
   RCLCPP_INFO(get_logger(), "Expanded factor graph node initialized.");
 }
 
-void FactorGraphTrackingNode::loadConfigs() {
-  declareAndLoadTopics(*this, topics_cfg_);
-  declareAndLoadEnv(*this, env_cfg_);
-  declareAndLoadFgo(*this, fgo_cfg_);
+void FactorGraphTrackingNode::loadConfigurations() {
+  declareAndLoadTopics(*this, topics_config_);
+  declareAndLoadEnv(*this, env_config_);
+  declareAndLoadFgo(*this, fgo_config_);
 }
+
+FactorGraphTrackingNode::~FactorGraphTrackingNode() = default;
 
 // ============================================================
 // ASV CALLBACKS
@@ -151,9 +153,9 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr msg) {
   ned_.gnssToNED(msg->lat, msg->lon, msg->height, n, e, d);
 
   double pos_sigma = std::clamp(static_cast<double>(msg->h_acc) / 1000.0,
-                                gps_sigma_floor_, gps_sigma_max_);
+                                fgo_config_.gps_sigma_floor, fgo_config_.gps_sigma_max);
 
-  double current_gnss_time = msg->header.stamp.seconds();
+  double current_gnss_time = rclcpp::Time(msg->header.stamp).seconds();
   // This handles the IMU integration and CombinedImuFactor automatically!
   gtsam::Key current_asv_key = getAsvKeyAtTime(current_gnss_time); // Key for the ASV node corresponding to GNSS measurement (either existing or newly created). IMU bridging is handled inside this function.
   uint64_t current_idx = gtsam::Symbol(current_asv_key).index();
@@ -196,7 +198,7 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr msg) {
   pim_->resetIntegrationAndSetBias(bias_);
 
   asv_index_ = asv_idx_next;
-  asv_timeline_[msg->header.stamp.seconds()] = X(asv_index_);
+  asv_timeline_[rclcpp::Time(msg->header.stamp).seconds()] = X(asv_index_);
 
   gtsam::Values final_est = isam2_.calculateEstimate();
   publishBoatState(final_est);
@@ -210,7 +212,7 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr msg) {
 // ============================================================
 gtsam::PreintegratedCombinedMeasurements FactorGraphTrackingNode::getPimFromBuffer(double t_start, double t_end) {
     // Clone your existing PIM parameters (bias, noise models)
-    gtsam::PreintegratedCombinedMeasurements sub_pim(pim_->params(), bias_);
+    gtsam::PreintegratedCombinedMeasurements sub_pim(pim_params_, bias_);
     
     double last_t = t_start;
     for (const auto& data : imu_buffer_) {
@@ -288,7 +290,7 @@ void FactorGraphTrackingNode::usblCallback(
   }
 
   uint8_t rov_id = msg->rov_id;
-  double sound_speed = env_cfg_.sound_speed;
+  double sound_speed = env_config_.sound_speed;
   double t_sent = msg->t_sent;
   double t_received = msg->t_received;
 
@@ -325,12 +327,12 @@ void FactorGraphTrackingNode::usblCallback(
   gtsam::Point3 p_prev = isam2_.calculateEstimate<gtsam::Point3>(r_prev);
   gtsam::Vector3 v_prev = isam2_.calculateEstimate<gtsam::Vector3>(w_prev);
 
-  values_.insert(r_curr, p_prev + (v_prev * dt_rov)); // Linear prediction
-  values_.insert(w_curr, v_prev);                    // Assume constant velocity
+  values_.insert(r_curr, (p_prev + (v_prev * dt_rov)).eval()); // Linear prediction
+  values_.insert(w_curr, v_prev.eval());                    // Assume constant velocity
   
   // 4. MOTION MODEL FACTORS: Connect to the previous ROV state
   // Add Constant Velocity Factor: (P_prev, V_prev, P_curr)
-  auto rov_noise = gtsam::noiseModel::Isotropic::Sigma(3, rov_process_vel_sigma_);
+  auto rov_noise = gtsam::noiseModel::Isotropic::Sigma(3, fgo_config_.rov_process_vel_sigma);
   graph_.add(boost::make_shared<ConstantVelocityFactor>(
       r_prev, w_prev, r_curr, dt_rov, rov_noise));
   // Also add a "Velocity Smoothness" factor (V_prev == V_curr)
@@ -339,17 +341,22 @@ void FactorGraphTrackingNode::usblCallback(
 
   // 5. MEASUREMENT FACTORS
   // Add USBL factor
-  auto body_P_sensor = gtsam::Pose3(usbl_rotation_, usbl_offset_);
-  auto usbl_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(2) << usbl_azimuth_sigma_, usbl_elevation_sigma_).finished());
+  gtsam::Point3 usbl_offset(env_config_.usbl_offset_x, env_config_.usbl_offset_y, env_config_.usbl_offset_z);
+  double roll_rad = env_config_.usbl_roll_deg * M_PI / 180.0;
+  double pitch_rad = env_config_.usbl_pitch_deg * M_PI / 180.0;
+  double yaw_rad = env_config_.usbl_yaw_deg * M_PI / 180.0;
+  gtsam::Rot3 usbl_rotation = gtsam::Rot3::RzRyRx(roll_rad, pitch_rad, yaw_rad);
+  gtsam::Pose3 body_P_sensor(usbl_rotation, usbl_offset);
+  auto usbl_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(2) << fgo_config_.usbl_azimuth_sigma, fgo_config_.usbl_elevation_sigma).finished());
   graph_.add(boost::make_shared<UsblFactor>(asv_received, r_curr, msg->azimuth, msg->elevation, body_P_sensor, usbl_noise));
 
   // Add Depth factor
-  auto depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, rov_depth_sigma_);
+  auto depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.rov_depth_sigma);
   graph_.add(boost::make_shared<DepthFactor>(r_curr, msg->position.z, depth_noise));
 
   // Add Acoustic Range factor (Psuedo-Range)
   double tof = t_r - t_s; 
-  auto acoustic_noise = gtsam::noiseModel::Isotropic::Sigma(1, acoustic_range_sigma_ / sound_speed); // Convert range sigma to time sigma using speed of sound
+  auto acoustic_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.acoustic_range_sigma / sound_speed); // Convert range sigma to time sigma using speed of sound
   graph_.add(boost::make_shared<PsudoRangeFactor>(asv_received, r_curr, tof, sound_speed, body_P_sensor, acoustic_noise)); // TODO: Change from hardcoded value
 
   // 6. UPDATE & CLEANUP
@@ -369,8 +376,8 @@ void FactorGraphTrackingNode::acousticCommCallback(
     return;
   }
 
-  uint8_t rov_id = msg->rov_id;
-  double sound_speed = env_cfg_.sound_speed;
+  uint8_t rov_id = msg->node_id;
+  double sound_speed = env_config_.sound_speed;
   double t_sent = msg->t_sent;
   double t_received = msg->t_received;
 
@@ -384,8 +391,6 @@ void FactorGraphTrackingNode::acousticCommCallback(
   // 1. ASV SIDE: Create/Retrieve the ASV Pose at Time of Arrival (t_received)
   double time = rclcpp::Time(t_received).seconds();
   auto asv_received = getAsvKeyAtTime(time);
-  uint64_t current_asv_idx = gtsam::Symbol(asv_received).index();
-  uint64_t asv_idx_next = asv_index_ + 1;
 
   // 2. ROV SIDE: Handle the sequence
   uint32_t current_rov_step = rov_step_counters_[rov_id];
@@ -404,12 +409,12 @@ void FactorGraphTrackingNode::acousticCommCallback(
   gtsam::Point3 p_prev = isam2_.calculateEstimate<gtsam::Point3>(r_prev);
   gtsam::Vector3 v_prev = isam2_.calculateEstimate<gtsam::Vector3>(w_prev);
 
-  values_.insert(r_curr, p_prev + (v_prev * dt_rov)); // Linear prediction
-  values_.insert(w_curr, v_prev);                    // Assume constant velocity
+  values_.insert(r_curr, (p_prev + (v_prev * dt_rov)).eval()); // Linear prediction
+  values_.insert(w_curr, v_prev.eval());                    // Assume constant velocity
   
   // 4. MOTION MODEL FACTORS: Connect to the previous ROV state
   // Add Constant Velocity Factor: (P_prev, V_prev, P_curr)
-  auto rov_noise = gtsam::noiseModel::Isotropic::Sigma(3, rov_process_vel_sigma_);
+  auto rov_noise = gtsam::noiseModel::Isotropic::Sigma(3, fgo_config_.rov_process_vel_sigma);
   graph_.add(boost::make_shared<ConstantVelocityFactor>(
       r_prev, w_prev, r_curr, dt_rov, rov_noise));
   // Also add a "Velocity Smoothness" factor (V_prev == V_curr)
@@ -418,13 +423,18 @@ void FactorGraphTrackingNode::acousticCommCallback(
 
   // 5. MEASUREMENT FACTORS
   // Add Depth factor
-  auto depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, rov_depth_sigma_);
+  auto depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.rov_depth_sigma);
   graph_.add(boost::make_shared<DepthFactor>(r_curr, msg->position.z, depth_noise));
 
   // Add Acoustic Range factor (Psuedo-Range)
   double tof = t_r - t_s; 
-  auto body_P_sensor = gtsam::Pose3(usbl_rotation_, usbl_offset_);
-  auto acoustic_noise = gtsam::noiseModel::Isotropic::Sigma(1, acoustic_range_sigma_ / sound_speed); // Convert range sigma to time sigma using speed of sound
+  gtsam::Point3 usbl_offset(env_config_.usbl_offset_x, env_config_.usbl_offset_y, env_config_.usbl_offset_z);
+  double roll_rad = env_config_.usbl_roll_deg * M_PI / 180.0;
+  double pitch_rad = env_config_.usbl_pitch_deg * M_PI / 180.0;
+  double yaw_rad = env_config_.usbl_yaw_deg * M_PI / 180.0;
+  gtsam::Rot3 usbl_rotation = gtsam::Rot3::RzRyRx(roll_rad, pitch_rad, yaw_rad);
+  gtsam::Pose3 body_P_sensor(usbl_rotation, usbl_offset);
+  auto acoustic_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.acoustic_range_sigma / sound_speed); // Convert range sigma to time sigma using speed of sound
   graph_.add(boost::make_shared<PsudoRangeFactor>(asv_received, r_curr, tof, sound_speed, body_P_sensor, acoustic_noise)); // TODO: Change from hardcoded value
 
   // 6. UPDATE & CLEANUP
@@ -448,8 +458,8 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
     gtsam::Pose3 world_T_asv = isam2_.calculateEstimate<gtsam::Pose3>(asv_key);
 
     // Calculate local position from Az, El, Range
-    double az = usbl->azimuth * M_PI / 180.0;
-    double el = usbl->elevation * M_PI / 180.0;
+    double az = (usbl->azimuth) * M_PI / 180.0;
+    double el = (usbl->elevation) * M_PI / 180.0;
     double tof = (usbl->t_received - usbl->t_sent) / 1e6; // TODO: ensure this is in seconds with appropriate precision. might need to change either the seatrac driver or this conversion.
     double r  = tof * speed_of_sound; // Speed of sound in water ~1500 m/s
 
@@ -458,16 +468,23 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
                           r * sin(el));
 
     // Transform to world and force depth from the depth sensor (it's more reliable)
-    gtsam::Pose3 body_P_sensor(usbl_rotation_, usbl_offset_);
-    gtsam::Point3 p_world = world_T_asv.transformFrom(body_P_sensor.transformFrom(p_local));
-    p_world = gtsam::Point3(p_world.x(), p_world.y(), usbl->position.z); // Assuming Z is Depth
+    gtsam::Point3 usbl_offset(env_config_.usbl_offset_x, env_config_.usbl_offset_y, env_config_.usbl_offset_z);
+    double roll_rad = env_config_.usbl_roll_deg * M_PI / 180.0;
+    double pitch_rad = env_config_.usbl_pitch_deg * M_PI / 180.0;
+    double yaw_rad = env_config_.usbl_yaw_deg * M_PI / 180.0;
+    gtsam::Rot3 usbl_rotation = gtsam::Rot3::RzRyRx(roll_rad, pitch_rad, yaw_rad);
+    gtsam::Pose3 body_P_sensor(usbl_rotation, usbl_offset);
+
+    gtsam::Point3 p_body = p_local;
+    gtsam::Point3 p_world = world_T_asv.transformFrom(body_P_sensor.transformFrom(p_body));
+    p_world = gtsam::Point3(p_world.x(), p_world.y(), usbl->position.z);
 
     values_.insert(rKey, p_world);
-    values_.insert(wKey, gtsam::Vector3::Zero());
+    values_.insert(wKey, gtsam::Vector3::Zero().eval());
 
     // Initial Priors
-    auto prior_pos_noise = gtsam::noiseModel::Isotropic::Sigma(3, rov_prior_pos_sigma_);
-    auto prior_vel_noise = gtsam::noiseModel::Isotropic::Sigma(3, rov_prior_vel_sigma_);
+    auto prior_pos_noise = gtsam::noiseModel::Isotropic::Sigma(3, fgo_config_.rov_prior_pos_sigma);
+    auto prior_vel_noise = gtsam::noiseModel::Isotropic::Sigma(3, fgo_config_.rov_prior_vel_sigma);
     graph_.add(gtsam::PriorFactor<gtsam::Point3>(rKey, p_world, prior_pos_noise));
     graph_.add(gtsam::PriorFactor<gtsam::Vector3>(wKey, gtsam::Vector3::Zero(), prior_vel_noise));
 
@@ -481,7 +498,7 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
     rov_initialised_[rov_id] = true;
     rov_step_counters_[rov_id] ++;
 
-    RCLCPP_INFO(get_logger(), "Initialized new ROV %u at time %.2f with position (%.2f, %.2f, %.2f)", 
+    RCLCPP_INFO(get_logger(), "Initialized new ROV %u at time %.2ld with position (%.2f, %.2f, %.2f)", 
                 rov_id, usbl->t_received, p_world.x(), p_world.y(), p_world.z());
 }
 
@@ -500,18 +517,18 @@ void FactorGraphTrackingNode::initializeGraph() {
   gtsam::imuBias::ConstantBias priorBias;
 
   auto pose_noise = gtsam::noiseModel::Diagonal::Sigmas(
-      (gtsam::Vector(6) << prior_pose_sigma_, prior_pose_sigma_,
-       prior_pose_sigma_, prior_pose_sigma_, prior_pose_sigma_,
-       prior_pose_sigma_)
+      (gtsam::Vector(6) << fgo_config_.prior_pose_sigma, fgo_config_.prior_pose_sigma,
+       fgo_config_.prior_pose_sigma, fgo_config_.prior_pose_sigma, fgo_config_.prior_pose_sigma,
+       fgo_config_.prior_pose_sigma)
           .finished());
 
   graph_.add(gtsam::PriorFactor<gtsam::Pose3>(X(asv_index_), priorPose, pose_noise));
   graph_.add(gtsam::PriorFactor<gtsam::Vector3>(
       V(asv_index_), priorVel,
-      gtsam::noiseModel::Isotropic::Sigma(3, prior_vel_sigma_)));
+      gtsam::noiseModel::Isotropic::Sigma(3, fgo_config_.prior_vel_sigma)));
   graph_.add(gtsam::PriorFactor<gtsam::imuBias::ConstantBias>(
       B(asv_index_), priorBias,
-      gtsam::noiseModel::Isotropic::Sigma(6, prior_bias_sigma_)));
+      gtsam::noiseModel::Isotropic::Sigma(6, fgo_config_.prior_bias_sigma)));
   
   last_asv_timestamp_ = 0.0;
   asv_index_ = 0;

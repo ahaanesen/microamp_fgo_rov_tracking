@@ -9,8 +9,7 @@
 #include <gtsam/navigation/NavState.h>
 #include <gtsam/noiseModel/Isotropic.h>
 
-// No header exists for these factors in the provided code, so include the implementation.
-#include "microamp_fgo_rov_tracking/rov_factors.cpp"
+#include "microamp_fgo_rov_tracking/rov_factors.hpp"
 
 namespace {
 

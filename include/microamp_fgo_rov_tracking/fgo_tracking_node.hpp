@@ -4,7 +4,6 @@
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/inference/Symbol.h>
 #include <gtsam/navigation/CombinedImuFactor.h>
-#include <gtsam/navigation/PreintegratedCombinedMeasurements.h>
 #include <gtsam/navigation/GPSFactor.h>
 #include <gtsam/navigation/ImuBias.h>
 #include <gtsam/nonlinear/ISAM2.h>
@@ -37,6 +36,8 @@ using gtsam::symbol_shorthand::X; // ASV Pose (x)
 using gtsam::symbol_shorthand::R; // ROV Position (r)
 using gtsam::symbol_shorthand::W; // ROV Velocity (w)
 
+using namespace gtsam;
+
 class FactorGraphTrackingNode : public rclcpp::Node {
 public:
   using Imu = sensor_msgs::msg::Imu;
@@ -47,6 +48,7 @@ public:
   using ROVState = blueboat_interfaces::msg::ROVState;
 
   FactorGraphTrackingNode();
+  ~FactorGraphTrackingNode() override;
 
 private:
   // ==================== INITIALIZATION & CONFIG ====================
@@ -77,9 +79,10 @@ private:
   gtsam::NonlinearFactorGraph graph_;
   gtsam::Values values_;
   std::mutex graph_mutex_;
+  bool graph_initialised_;
   
   std::map<double, gtsam::Key> asv_timeline_; // Maps timestamp (seconds) to the GTSAM Key for the ASV
-  uint64_t asv_index_ = 0; // Counter for the ASV symbol index
+  uint64_t asv_index_; // Counter for the ASV symbol index
   double last_asv_timestamp_ = -1.0; // The timestamp of the very last ASV node added to the graph
 
   std::map<uint8_t, bool> rov_initialised_; // Maps ROV ID to its initialization status
@@ -88,12 +91,12 @@ private:
 
   // ==================== ASV NAVIGATION ====================
   std::unique_ptr<gtsam::PreintegratedCombinedMeasurements> pim_;
+  boost::shared_ptr<gtsam::PreintegrationCombinedParams> pim_params_;
   gtsam::imuBias::ConstantBias bias_;
   double gravity_;
 
-  NEDConverter ned_;
+  NedConverter ned_;
   bool datum_initialised_;
-  bool graph_initialised_;
   bool imu_initialised_ = false;
 
   rclcpp::Time last_imu_time_; 

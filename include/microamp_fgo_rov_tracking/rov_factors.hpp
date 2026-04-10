@@ -51,8 +51,8 @@ public:
 					const gtsam::Pose3& body_P_sensor, 
                     const gtsam::SharedNoiseModel& model);
 	~PsudoRangeFactor() override = default;
-	gtsam::Vector evaluateError(const gtsam::Pose3& asvPose, c
-                                onst gtsam::Point3& rovPoint,
+	gtsam::Vector evaluateError(const gtsam::Pose3& asvPose,
+                                const gtsam::Point3& rovPoint,
                                 boost::optional<gtsam::Matrix&> H_asv = boost::none,
                                 boost::optional<gtsam::Matrix&> H_rov = boost::none) const override;
 	gtsam::NonlinearFactor::shared_ptr clone() const override;
