@@ -71,6 +71,28 @@ TEST(UsblFactorTest, JacobiansMatchNumericalDerivatives) {
 
     ExpectMatrixNear(H_asv_analytic, H_asv_num, 1e-5);
     ExpectMatrixNear(H_rov_analytic, H_rov_num, 1e-6);
+
+    // Frame invariance test: The USBL measurement should only depend on the relative geometry, not the absolute position of the ASV. If we shift the ASV and ROV together, the measurement should be unchanged.
+    const gtsam::Pose3 world_T_asv = asvPose.inverse();
+    const gtsam::Pose3 sensor_T_asv = body_P_sensor.inverse();
+    const gtsam::Pose3 world_T_sensor = world_T_asv.compose(sensor_T_asv);
+    const gtsam::Point3 local_alt = world_T_sensor.transformTo(rovPoint);
+    double az_alt = std::atan2(local_alt.y(), local_alt.x());
+    if (az_alt < 0.0) az_alt += 2.0 * M_PI;
+    double el_alt = std::atan2(local_alt.z(), std::sqrt(local_alt.x() * local_alt.x() + local_alt.y() * local_alt.y()));
+    EXPECT_NEAR(Rad2Deg(az_alt), Rad2Deg(az), 1e-6);
+    EXPECT_NEAR(Rad2Deg(el_alt), Rad2Deg(el), 1e-6);
+
+    // Test near singularity (ROV directly below ASV): both error bound and finite jacobians.
+    const gtsam::Point3 rov_below = asvPose.translation() + gtsam::Point3(0.0, 0.0, -10.0);
+    const gtsam::Vector err_below = factor.evaluateError(asvState, rov_below);
+    EXPECT_NEAR(err_below(0), 0.0, 1e-6);
+    EXPECT_NEAR(err_below(1), 0.0, 1e-6);
+    gtsam::Matrix H_asv_below, H_rov_below;
+    factor.evaluateError(asvState, rov_below, H_asv_below, H_rov_below);
+    ExpectMatrixNear(H_asv_below, H_asv_num, 1e-5);
+    ExpectMatrixNear(H_rov_below, H_rov_num, 1e-6);
+
 }
 
 TEST(DepthFactorTest, JacobianMatchesNumericalDerivative) {
@@ -92,6 +114,7 @@ TEST(DepthFactorTest, JacobianMatchesNumericalDerivative) {
             gtsam::numericalDerivative11<gtsam::Vector, gtsam::Point3>(f, p, 1e-6);
 
     ExpectMatrixNear(H_analytic, H_num, 1e-9);
+    ExpectMatrixNear(H_analytic, (gtsam::Matrix(1, 3) << 0.0, 0.0, 1.0).finished(), 1e-9);
 }
 
 TEST(ROVConstantVelocityFactorTest, JacobiansMatchNumericalDerivatives) {
@@ -130,5 +153,33 @@ TEST(ROVConstantVelocityFactorTest, JacobiansMatchNumericalDerivatives) {
     ExpectMatrixNear(H2_analytic, H2_num, 1e-9);
     ExpectMatrixNear(H3_analytic, H3_num, 1e-9);
 }
+
+TEST(ROVConstantVelocityFactorTest, JacobiansOffResidual) {
+  const double dt = 0.2;
+  auto model = gtsam::noiseModel::Isotropic::Sigma(3, 0.1);
+
+  ROVConstantVelocityFactor factor(1, 2, 3, dt, model);
+
+  gtsam::Point3 p_t(2.0, -1.0, 0.5);
+  gtsam::Vector3 v_t(0.3, 0.1, -0.2);
+
+  // Intentionally wrong p_tp1
+  gtsam::Point3 p_tp1 = p_t + v_t * dt + gtsam::Point3(0.2, -0.1, 0.05);
+
+  gtsam::Matrix H1, H2, H3;
+  factor.evaluateError(p_t, v_t, p_tp1, H1, H2, H3);
+
+  auto f = [&](const gtsam::Point3& p,
+               const gtsam::Vector3& v,
+               const gtsam::Point3& pn) {
+    return factor.evaluateError(p, v, pn);
+  };
+
+  auto H1_num = gtsam::numericalDerivative31<gtsam::Vector,
+      gtsam::Point3, gtsam::Vector3, gtsam::Point3>(f, p_t, v_t, p_tp1, 1e-6);
+
+  ExpectMatrixNear(H1, H1_num, 1e-6);
+}
+``
 
 }  // namespace
