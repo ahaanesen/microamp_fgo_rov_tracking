@@ -53,8 +53,8 @@ public:
 private:
   // ==================== INITIALIZATION & CONFIG ====================
   void loadConfigurations();
-  void initializeGraph();
   void initializeDatumFromGNSS(const GNSSNavPvt &msg);
+  void initializeGraphWithGNSS(const GNSSNavPvt::SharedPtr msg);
 
   // ==================== ASV STATE ====================
   void imuCallback(const Imu::SharedPtr msg);

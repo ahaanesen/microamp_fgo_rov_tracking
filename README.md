@@ -1,6 +1,28 @@
 # FGO for ROV tracking and ASV navigation
+Run program using docker and generated dataset.
 
+How to run docker:
+```
+docker compose build
+docker compose up -d
+docker exec -it ros2_humble bash
+```
+Reopening in docker container migth be preferable to only opening the container in terminal.
 
+Copy the generated measurements from the eskf docker container into the fgo docker container. 
+inside the container from  ~ros2_ws:
+```
+ros2 run microamp_fgo_rov_tracking fgo_tracking_node
+```
+In a new terminal:
+```
+ros2 bag play /tmp/fgo_dataset --clock
+```
+
+Whenever code changes, the program needs to be built again to apply them using
+```
+colcon build --packages-select microamp_fgo_rov_tracking
+```
 
 ## Getting started
 

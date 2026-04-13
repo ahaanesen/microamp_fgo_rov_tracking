@@ -1,0 +1,9 @@
+{
+  "duration_sec": 300.0,
+  "dt_sec": 0.1,
+  "seed": 42,
+  "rov_id": 1,
+  "epoch_sec": 1700000000,
+  "frame": "NED",
+  "notes": "t_ros_* aligned with rosbag exporter if epoch_sec matches."
+}
