@@ -16,6 +16,7 @@ FactorGraphTrackingNode::FactorGraphTrackingNode()
       graph_initialised_(false), asv_index_(0), datum_initialised_(false) {
   
   loadConfigurations();
+  max_imu_buffer_duration_ = env_config_.imu_buffer_duration_sec;
 
   // ------------------------------------------------------------------
   // IMU Preintegration (NED)
@@ -186,19 +187,20 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr msg) {
 // ============================================================
 // HELPERS
 // ============================================================
-gtsam::PreintegratedCombinedMeasurements FactorGraphTrackingNode::getPimFromBuffer(double t_start, double t_end) {
-    // Clone your existing PIM parameters (bias, noise models)
-    gtsam::PreintegratedCombinedMeasurements sub_pim(pim_params_, bias_);
-    
-    double last_t = t_start;
-    for (const auto& data : imu_buffer_) {
-        if (data.timestamp > t_start && data.timestamp <= t_end) {
-            double dt = data.timestamp - last_t;
-            sub_pim.integrateMeasurement(data.acc, data.gyro, dt);
-            last_t = data.timestamp;
-        }
-    }
-    return sub_pim;
+gtsam::PreintegratedCombinedMeasurements FactorGraphTrackingNode::getPimFromBuffer(
+    double t_start, double t_end,
+    const gtsam::imuBias::ConstantBias& bias) const {
+  gtsam::PreintegratedCombinedMeasurements sub_pim(pim_params_, bias);
+  
+  double last_t = t_start;
+  for (const auto& data : imu_buffer_) {
+      if (data.timestamp > t_start && data.timestamp <= t_end) {
+          double dt = data.timestamp - last_t;
+          sub_pim.integrateMeasurement(data.acc, data.gyro, dt);
+          last_t = data.timestamp;
+      }
+  }
+  return sub_pim;
 }
 
 // This function checks if an ASV node already exists at the target_time (within 1ms). If it does, it returns that key.
@@ -211,20 +213,35 @@ gtsam::Key FactorGraphTrackingNode::getAsvKeyAtTime(double target_time) {
         return it->second; // Already exists (likely from a previous ROV in same TDMA slot)
     }
 
+    if (target_time < last_asv_timestamp_ - 0.001) {
+        auto upper = asv_timeline_.upper_bound(target_time);
+        if (upper == asv_timeline_.begin()) {
+            RCLCPP_WARN(get_logger(),
+                        "Requested past ASV time %.3f before timeline start. Reusing earliest node.",
+                        target_time);
+            return upper->second;
+        }
+
+        --upper;
+        RCLCPP_WARN(get_logger(),
+                    "Requested past ASV time %.3f while latest ASV node is %.3f. Reusing existing node at %.3f.",
+                    target_time, last_asv_timestamp_, upper->first);
+        return upper->second;
+    }
+
     // 2. Find the most recent node in the graph
     double t_prev = last_asv_timestamp_;
     uint64_t idx_prev = asv_index_;
     uint64_t idx_curr = asv_index_ + 1;
 
-    // 3. Bridge the gap using the IMU Buffer
-    // Create a temporary PIM for this specific sub-interval
-    auto sub_pim = getPimFromBuffer(t_prev, target_time);
-
-    // 4. Predict the state at target_time
     auto prev_pose = isam2_.calculateEstimate<gtsam::Pose3>(X(idx_prev));
     auto prev_vel  = isam2_.calculateEstimate<gtsam::Vector3>(V(idx_prev));
     auto prev_bias = isam2_.calculateEstimate<gtsam::imuBias::ConstantBias>(B(idx_prev));
+
+    // 3. Bridge the gap using the IMU buffer with the parent node bias.
+    auto sub_pim = getPimFromBuffer(t_prev, target_time, prev_bias);
     
+    // 4. Predict the state at target_time
     gtsam::NavState prev_state(prev_pose, prev_vel);
     auto predicted = sub_pim.predict(prev_state, prev_bias);
 
@@ -271,8 +288,8 @@ void FactorGraphTrackingNode::usblCallback(
 
   uint8_t rov_id = msg->rov_id;
   double sound_speed = env_config_.sound_speed;
-  // double t_sent = msg->t_sent;
-  // double t_received = msg->t_received;
+  double t_s = static_cast<double>(msg->t_sent) / 1e6;
+  double t_r = static_cast<double>(msg->t_received) / 1e6;
 
   std::lock_guard<std::mutex> lock(graph_mutex_);
 
@@ -284,11 +301,8 @@ void FactorGraphTrackingNode::usblCallback(
     return;
   }
   
-  // 1. ASV SIDE: Create/Retrieve the ASV Pose at Time of Arrival (t_received)
-  // double time = t_received / 1e6; // Convert microseconds to seconds
-  auto asv_received = getAsvKeyAtTime(header_time);
-  // uint64_t current_asv_idx = gtsam::Symbol(asv_received).index();
-  // uint64_t asv_idx_next = asv_index_ + 1;
+  // 1. ASV SIDE: Use the ASV state at acoustic receive time.
+  gtsam::Key asv_received = getAsvKeyAtTime(t_r);
 
   // 2. ROV SIDE: Handle the sequence
   uint32_t current_rov_step = rov_step_counters_[rov_id];
@@ -297,10 +311,13 @@ void FactorGraphTrackingNode::usblCallback(
   gtsam::Key r_prev = getRovKey('R', rov_id, current_rov_step - 1);
   gtsam::Key w_prev = getRovKey('W', rov_id, current_rov_step - 1);
 
-  // Use double for precision: (usec - usec) / 1e6
-  double t_s = static_cast<double>(msg->t_sent) / 1e6;
-  double t_r = static_cast<double>(msg->t_received) / 1e6;
   double dt_rov = t_s - last_rov_timestamp_[rov_id];
+  if (dt_rov <= 0.0) {
+    RCLCPP_WARN(get_logger(),
+                "Non-positive ROV dt=%.6f for ROV %u (t_s=%.6f, last=%.6f), skipping USBL update",
+                dt_rov, rov_id, t_s, last_rov_timestamp_[rov_id]);
+    return;
+  }
 
   // 3. PREDICTION: Provide Initial Values for the Optimizer
   // We predict where the ROV is now based on its last known position and velocity
@@ -309,6 +326,10 @@ void FactorGraphTrackingNode::usblCallback(
 
   values_.insert(r_curr, (p_prev + (v_prev * dt_rov)).eval()); // Linear prediction
   values_.insert(w_curr, v_prev.eval());                    // Assume constant velocity
+
+  // // NB: no constraint on velocity. Adding a weak prior to prevent unbounded growth in early stages before we have good measurements. FGO crashes witout any velocity constraint.
+  // auto weak_vel_noise = gtsam::noiseModel::Isotropic::Sigma(3, 1.0); // tune
+  // graph_.add(gtsam::PriorFactor<gtsam::Vector3>(w_curr, v_prev, weak_vel_noise));
   
   // 4. MOTION MODEL FACTORS: Connect to the previous ROV state
   // Add Constant Velocity Factor: (P_prev, V_prev, P_curr)
@@ -343,13 +364,18 @@ void FactorGraphTrackingNode::usblCallback(
   isam2_.update(graph_, values_);
   graph_.resize(0);
   values_.clear();
-  last_rov_timestamp_[rov_id] = header_time;
+  last_rov_timestamp_[rov_id] = t_s;
   rov_step_counters_[rov_id]++;
+
+  gtsam::Values final_est = isam2_.calculateEstimate();
+  publishBoatState(final_est);
+  publishROVState(final_est);
   
   RCLCPP_DEBUG(get_logger(), "Added USBL, Depth, and Psuedo-Range factors for ROV %u at step %u", rov_id, rov_step_counters_[rov_id]);
 }
 
 // Will only receive this if there is something wrong with the USBL measurement.
+// TODO: fix to match USBL pattern
 void FactorGraphTrackingNode::acousticCommCallback(
     const AcousticCommReceive::SharedPtr msg) {
   if (!graph_initialised_) {
@@ -369,7 +395,7 @@ void FactorGraphTrackingNode::acousticCommCallback(
   }
   
   // 1. ASV SIDE: Create/Retrieve the ASV Pose at Time of Arrival (t_received)
-  double time = rclcpp::Time(t_received).seconds();
+  double time = static_cast<double>(t_received) / 1e6;
   auto asv_received = getAsvKeyAtTime(time);
 
   // 2. ROV SIDE: Handle the sequence
@@ -383,6 +409,12 @@ void FactorGraphTrackingNode::acousticCommCallback(
   double t_s = static_cast<double>(msg->t_sent) / 1e6;
   double t_r = static_cast<double>(msg->t_received) / 1e6;
   double dt_rov = t_s - last_rov_timestamp_[rov_id];
+  if (dt_rov <= 0.0) {
+    RCLCPP_WARN(get_logger(),
+                "Non-positive ROV dt=%.6f for ROV %u (t_s=%.6f, last=%.6f), skipping acoustic update",
+                dt_rov, rov_id, t_s, last_rov_timestamp_[rov_id]);
+    return;
+  }
 
   // 3. PREDICTION: Provide Initial Values for the Optimizer
   // We predict where the ROV is now based on its last known position and velocity
@@ -424,6 +456,10 @@ void FactorGraphTrackingNode::acousticCommCallback(
   last_rov_timestamp_[rov_id] = t_sent;
   rov_step_counters_[rov_id]++;
 
+  gtsam::Values final_est = isam2_.calculateEstimate();
+  publishBoatState(final_est);
+  publishROVState(final_est);
+
   RCLCPP_DEBUG(get_logger(), "Added Acoustic Comm factors for ROV %u at step %u", rov_id, rov_step_counters_[rov_id]);
 }
 
@@ -435,6 +471,8 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
                                                const USBLMessage::SharedPtr& usbl,
                                                double speed_of_sound) {
     double header_time = rclcpp::Time(usbl->header.stamp).seconds();
+    double t_s = static_cast<double>(usbl->t_sent) / 1e6;
+    double t_r = static_cast<double>(usbl->t_received) / 1e6;
     RCLCPP_INFO(get_logger(), "Initializing new ROV %u with first USBL measurement at time %.2f", rov_id, header_time);
     
     // Check if we have any ASV timeline entries (i.e., at least one GNSS fix processed)
@@ -443,7 +481,7 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
         return;
     }
     
-    gtsam::Key asv_key = getAsvKeyAtTime(header_time);
+    gtsam::Key asv_key = getAsvKeyAtTime(t_r);
     
     // DON'T update iSAM2 yet - we need to add the ROV initialization factors first
     // to avoid an underconstrained system. The ASV node created by getAsvKeyAtTime()
@@ -491,7 +529,20 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
     graph_.add(gtsam::PriorFactor<gtsam::Point3>(rKey, p_world, prior_pos_noise));
     graph_.add(gtsam::PriorFactor<gtsam::Vector3>(wKey, gtsam::Vector3::Zero(), prior_vel_noise));
 
-    last_rov_timestamp_[rov_id] = header_time;
+    auto usbl_noise = gtsam::noiseModel::Diagonal::Sigmas(
+        (gtsam::Vector(2) << fgo_config_.usbl_azimuth_sigma,
+         fgo_config_.usbl_elevation_sigma).finished());
+    auto depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.rov_depth_sigma);
+    auto acoustic_noise = gtsam::noiseModel::Isotropic::Sigma(
+        1, fgo_config_.acoustic_range_sigma / speed_of_sound);
+
+    graph_.add(boost::make_shared<UsblFactor>(
+        asv_key, rKey, usbl->azimuth, usbl->elevation, body_P_sensor, usbl_noise));
+    graph_.add(boost::make_shared<DepthFactor>(rKey, usbl->position.z, depth_noise));
+    graph_.add(boost::make_shared<PsudoRangeFactor>(
+        asv_key, rKey, tof, speed_of_sound, body_P_sensor, acoustic_noise));
+
+    last_rov_timestamp_[rov_id] = t_s;
     rov_step_counters_[rov_id] = 0;
 
     // Now update iSAM2 with BOTH the ASV node (from getAsvKeyAtTime) AND the ROV initialization
@@ -502,6 +553,10 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
 
     rov_initialised_[rov_id] = true;
     rov_step_counters_[rov_id] ++;
+
+    gtsam::Values final_est = isam2_.calculateEstimate();
+    publishBoatState(final_est);
+    publishROVState(final_est);
 
     RCLCPP_INFO(get_logger(), "Initialized new ROV %u at time %.2f with position (%.2f, %.2f, %.2f)", 
                 rov_id, header_time, p_world.x(), p_world.y(), p_world.z());
@@ -518,7 +573,7 @@ void FactorGraphTrackingNode::initializeGraphWithGNSS(const GNSSNavPvt::SharedPt
   double n, e, d;
   ned_.gnssToNED(msg->lat, msg->lon, msg->height, n, e, d);
 
-  gtsam::Pose3 priorPose;
+  gtsam::Pose3 priorPose(gtsam::Rot3::RzRyRx(0, 0, 0), gtsam::Point3(n, e, d));
   gtsam::Vector3 priorVel(0.0, 0.0, 0.0);
   gtsam::imuBias::ConstantBias priorBias;
 
