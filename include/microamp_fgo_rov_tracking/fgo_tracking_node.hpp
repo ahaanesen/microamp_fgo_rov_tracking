@@ -15,6 +15,8 @@
 #include <memory>
 #include <mutex>
 #include <deque>
+#include <cstdint>
+#include <utility>
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/imu.hpp"
@@ -71,6 +73,10 @@ private:
   gtsam::PreintegratedCombinedMeasurements getPimFromBuffer(
       double t_start, double t_end,
       const gtsam::imuBias::ConstantBias& bias) const;
+  std::pair<double, double> resolveAcousticTimestamps(
+      const rclcpp::Time& header_stamp,
+      uint64_t t_sent_us,
+      uint64_t t_received_us) const;
   gtsam::Key getAsvKeyAtTime(double target_time);
   gtsam::Key getRovKey(unsigned char prefix, uint32_t rov_id, uint32_t time_step);
 

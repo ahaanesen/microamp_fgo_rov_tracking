@@ -6,6 +6,9 @@
 #include <gtsam/nonlinear/NonlinearFactor.h>
 #include <gtsam/base/numericalDerivative.h>
 
+#include <algorithm>
+#include <cmath>
+
 
 // ============================================================
 // CONSTRUCTOR, DESTRUCTOR, AND INITIALIZATION
@@ -203,6 +206,33 @@ gtsam::PreintegratedCombinedMeasurements FactorGraphTrackingNode::getPimFromBuff
   return sub_pim;
 }
 
+std::pair<double, double> FactorGraphTrackingNode::resolveAcousticTimestamps(
+    const rclcpp::Time& header_stamp,
+    uint64_t t_sent_us,
+    uint64_t t_received_us) const {
+  constexpr double MIN_EPOCH_SEC = 1.0e8;  // ~1973
+  constexpr double MAX_EPOCH_SEC = 4.0e9;  // ~2096
+  constexpr double MAX_HEADER_MISMATCH_SEC = 5.0;
+
+  const double header_time = header_stamp.seconds();
+  const double raw_t_s = static_cast<double>(t_sent_us) / 1e6;
+  const double raw_t_r = static_cast<double>(t_received_us) / 1e6;
+  const double tof = raw_t_r - raw_t_s;
+
+  const bool sent_epoch_like = raw_t_s > MIN_EPOCH_SEC && raw_t_s < MAX_EPOCH_SEC;
+  const bool recv_epoch_like = raw_t_r > MIN_EPOCH_SEC && raw_t_r < MAX_EPOCH_SEC;
+  const bool recv_matches_header = std::abs(raw_t_r - header_time) < MAX_HEADER_MISMATCH_SEC;
+
+  // If modem timestamps are not ROS-epoch aligned, anchor receive time to the ROS header.
+  if (!(sent_epoch_like && recv_epoch_like && recv_matches_header)) {
+    const double t_r = header_time;
+    const double t_s = t_r - tof;
+    return {t_s, t_r};
+  }
+
+  return {raw_t_s, raw_t_r};
+}
+
 // This function checks if an ASV node already exists at the target_time (within 1ms). If it does, it returns that key.
 // If not, it creates a new ASV node at target_time by bridging from the last known ASV node using IMU data from the buffer.
 gtsam::Key FactorGraphTrackingNode::getAsvKeyAtTime(double target_time) {
@@ -214,19 +244,26 @@ gtsam::Key FactorGraphTrackingNode::getAsvKeyAtTime(double target_time) {
     }
 
     if (target_time < last_asv_timestamp_ - 0.001) {
-        auto upper = asv_timeline_.upper_bound(target_time);
+        auto upper = asv_timeline_.lower_bound(target_time);
         if (upper == asv_timeline_.begin()) {
             RCLCPP_WARN(get_logger(),
                         "Requested past ASV time %.3f before timeline start. Reusing earliest node.",
                         target_time);
             return upper->second;
         }
+        if (upper == asv_timeline_.end()) {
+            auto latest = std::prev(asv_timeline_.end());
+            return latest->second;
+        }
 
-        --upper;
+        auto lower = std::prev(upper);
+        const double dt_upper = std::abs(upper->first - target_time);
+        const double dt_lower = std::abs(lower->first - target_time);
+        auto chosen = (dt_upper < dt_lower) ? upper : lower;
         RCLCPP_WARN(get_logger(),
-                    "Requested past ASV time %.3f while latest ASV node is %.3f. Reusing existing node at %.3f.",
-                    target_time, last_asv_timestamp_, upper->first);
-        return upper->second;
+                    "Requested past ASV time %.3f while latest ASV node is %.3f. Reusing nearest existing node at %.3f.",
+                    target_time, last_asv_timestamp_, chosen->first);
+        return chosen->second;
     }
 
     // 2. Find the most recent node in the graph
@@ -288,8 +325,14 @@ void FactorGraphTrackingNode::usblCallback(
 
   uint8_t rov_id = msg->rov_id;
   double sound_speed = env_config_.sound_speed;
-  double t_s = static_cast<double>(msg->t_sent) / 1e6;
-  double t_r = static_cast<double>(msg->t_received) / 1e6;
+  auto [t_s, t_r] = resolveAcousticTimestamps(rclcpp::Time(msg->header.stamp), msg->t_sent, msg->t_received);
+  double tof = t_r - t_s;
+  if (tof <= 0.0 || tof > 5.0) {
+    RCLCPP_WARN(get_logger(),
+                "Invalid USBL TOF %.6f s for ROV %u (t_s=%.6f, t_r=%.6f), skipping update",
+                tof, rov_id, t_s, t_r);
+    return;
+  }
 
   std::lock_guard<std::mutex> lock(graph_mutex_);
 
@@ -356,7 +399,6 @@ void FactorGraphTrackingNode::usblCallback(
   graph_.add(boost::make_shared<DepthFactor>(r_curr, msg->position.z, depth_noise));
 
   // Add Acoustic Range factor (Psuedo-Range)
-  double tof = t_r - t_s; 
   auto acoustic_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.acoustic_range_sigma / sound_speed); // Convert range sigma to time sigma using speed of sound
   graph_.add(boost::make_shared<PsudoRangeFactor>(asv_received, r_curr, tof, sound_speed, body_P_sensor, acoustic_noise)); // TODO: Change from hardcoded value
 
@@ -384,8 +426,14 @@ void FactorGraphTrackingNode::acousticCommCallback(
 
   uint8_t rov_id = msg->node_id;
   double sound_speed = env_config_.sound_speed;
-  double t_sent = msg->t_sent;
-  double t_received = msg->t_received;
+  auto [t_s, t_r] = resolveAcousticTimestamps(rclcpp::Time(msg->header.stamp), msg->t_sent, msg->t_received);
+  double tof = t_r - t_s;
+  if (tof <= 0.0 || tof > 5.0) {
+    RCLCPP_WARN(get_logger(),
+                "Invalid acoustic TOF %.6f s for ROV %u (t_s=%.6f, t_r=%.6f), skipping update",
+                tof, rov_id, t_s, t_r);
+    return;
+  }
 
   std::lock_guard<std::mutex> lock(graph_mutex_);
 
@@ -395,8 +443,7 @@ void FactorGraphTrackingNode::acousticCommCallback(
   }
   
   // 1. ASV SIDE: Create/Retrieve the ASV Pose at Time of Arrival (t_received)
-  double time = static_cast<double>(t_received) / 1e6;
-  auto asv_received = getAsvKeyAtTime(time);
+  auto asv_received = getAsvKeyAtTime(t_r);
 
   // 2. ROV SIDE: Handle the sequence
   uint32_t current_rov_step = rov_step_counters_[rov_id];
@@ -406,8 +453,6 @@ void FactorGraphTrackingNode::acousticCommCallback(
   gtsam::Key w_prev = getRovKey('W', rov_id, current_rov_step - 1);
 
   // Use double for precision: (usec - usec) / 1e6
-  double t_s = static_cast<double>(msg->t_sent) / 1e6;
-  double t_r = static_cast<double>(msg->t_received) / 1e6;
   double dt_rov = t_s - last_rov_timestamp_[rov_id];
   if (dt_rov <= 0.0) {
     RCLCPP_WARN(get_logger(),
@@ -439,7 +484,6 @@ void FactorGraphTrackingNode::acousticCommCallback(
   graph_.add(boost::make_shared<DepthFactor>(r_curr, msg->position.z, depth_noise));
 
   // Add Acoustic Range factor (Psuedo-Range)
-  double tof = t_r - t_s; 
   gtsam::Point3 usbl_offset(env_config_.usbl_offset_x, env_config_.usbl_offset_y, env_config_.usbl_offset_z);
   double roll_rad = env_config_.usbl_roll_deg * M_PI / 180.0;
   double pitch_rad = env_config_.usbl_pitch_deg * M_PI / 180.0;
@@ -453,7 +497,7 @@ void FactorGraphTrackingNode::acousticCommCallback(
   isam2_.update(graph_, values_);
   graph_.resize(0);
   values_.clear();
-  last_rov_timestamp_[rov_id] = t_sent;
+  last_rov_timestamp_[rov_id] = t_s;
   rov_step_counters_[rov_id]++;
 
   gtsam::Values final_est = isam2_.calculateEstimate();
@@ -471,8 +515,14 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
                                                const USBLMessage::SharedPtr& usbl,
                                                double speed_of_sound) {
     double header_time = rclcpp::Time(usbl->header.stamp).seconds();
-    double t_s = static_cast<double>(usbl->t_sent) / 1e6;
-    double t_r = static_cast<double>(usbl->t_received) / 1e6;
+    auto [t_s, t_r] = resolveAcousticTimestamps(rclcpp::Time(usbl->header.stamp), usbl->t_sent, usbl->t_received);
+    double tof = t_r - t_s;
+    if (tof <= 0.0 || tof > 5.0) {
+        RCLCPP_WARN(get_logger(),
+                    "Invalid initialization TOF %.6f s for ROV %u (t_s=%.6f, t_r=%.6f), skipping init",
+                    tof, rov_id, t_s, t_r);
+        return;
+    }
     RCLCPP_INFO(get_logger(), "Initializing new ROV %u with first USBL measurement at time %.2f", rov_id, header_time);
     
     // Check if we have any ASV timeline entries (i.e., at least one GNSS fix processed)
@@ -501,7 +551,6 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
     // Calculate local position from Az, El, Range
     double az = (usbl->azimuth) * M_PI / 180.0;
     double el = (usbl->elevation) * M_PI / 180.0;
-    double tof = (usbl->t_received - usbl->t_sent) / 1e6; // TODO: ensure this is in seconds with appropriate precision. might need to change either the seatrac driver or this conversion.
     double r  = tof * speed_of_sound; // Speed of sound in water ~1500 m/s
 
     gtsam::Point3 p_local(r * cos(el) * cos(az), 
