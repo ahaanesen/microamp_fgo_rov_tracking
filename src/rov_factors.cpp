@@ -15,15 +15,6 @@ inline double wrapToPi(double angle) {
     return angle;
 }
 
-inline double angleToRadians(double angle) {
-    // Some sources provide USBL angles in degrees, others in radians.
-    // Heuristic: if magnitude exceeds 2*pi, treat as degrees.
-    if (std::abs(angle) > (2.0 * M_PI + 1e-3)) {
-        return angle * M_PI / 180.0;
-    }
-    return angle;
-}
-
 UsblFactor::UsblFactor(
     Key asvKey,
     Key rovKey,
@@ -41,8 +32,8 @@ Vector UsblFactor::evaluateError(
     const gtsam::Point3& rovPoint,
     boost::optional<gtsam::Matrix&> H_asv,
     boost::optional<gtsam::Matrix&> H_rov) const {
-    const double measAzimuthRad = angleToRadians(measuredAzimuth_);
-    const double measElevationRad = angleToRadians(measuredElevation_);
+    const double measAzimuthRad = measuredAzimuth_ * M_PI / 180.0;
+    const double measElevationRad = measuredElevation_ * M_PI / 180.0;
 
     gtsam::Matrix66 H_pose_asv;
     gtsam::Pose3 world_P_sensor = asvPose.compose(body_P_sensor_, H_asv ? &H_pose_asv : nullptr);
