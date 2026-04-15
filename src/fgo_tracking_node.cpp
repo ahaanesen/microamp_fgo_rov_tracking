@@ -339,6 +339,7 @@ void FactorGraphTrackingNode::usblCallback(
   double sound_speed = env_config_.sound_speed;
   double t_s = static_cast<double>(msg->t_sent) / 1e6;
   double t_r = static_cast<double>(msg->t_received) / 1e6;
+  const double measurement_time = t_r;
 
   std::lock_guard<std::mutex> lock(graph_mutex_);
 
@@ -360,11 +361,11 @@ void FactorGraphTrackingNode::usblCallback(
   gtsam::Key r_prev = getRovKey('R', rov_id, current_rov_step - 1);
   gtsam::Key w_prev = getRovKey('W', rov_id, current_rov_step - 1);
 
-  double dt_rov = header_time - last_rov_timestamp_[rov_id];
+  double dt_rov = measurement_time - last_rov_timestamp_[rov_id];
   if (dt_rov <= 0.0) {
     RCLCPP_WARN(get_logger(),
-                "Non-positive ROV dt=%.6f for ROV %u (t_s=%.6f, last=%.6f), skipping USBL update",
-                dt_rov, rov_id, t_s, last_rov_timestamp_[rov_id]);
+                "Non-positive ROV dt=%.6f for ROV %u (t_r=%.6f, last=%.6f), skipping USBL update",
+                dt_rov, rov_id, measurement_time, last_rov_timestamp_[rov_id]);
     return;
   }
 
@@ -408,7 +409,7 @@ void FactorGraphTrackingNode::usblCallback(
   isam2_.update(graph_, values_);
   graph_.resize(0);
   values_.clear();
-  last_rov_timestamp_[rov_id] = header_time;
+  last_rov_timestamp_[rov_id] = measurement_time;
   rov_step_counters_[rov_id]++;
 
   gtsam::Values final_est = isam2_.calculateEstimate();
@@ -425,12 +426,12 @@ void FactorGraphTrackingNode::acousticCommCallback(
   if (!graph_initialised_) {
     return;
   }
-  double header_time = rclcpp::Time(msg->header.stamp).seconds();
   uint8_t rov_id = msg->node_id;
   double sound_speed = env_config_.sound_speed;
     // Use double for precision: (usec - usec) / 1e6
   double t_s = static_cast<double>(msg->t_sent) / 1e6;
   double t_r = static_cast<double>(msg->t_received) / 1e6;
+  const double measurement_time = t_r;
 
   std::lock_guard<std::mutex> lock(graph_mutex_);
 
@@ -449,11 +450,11 @@ void FactorGraphTrackingNode::acousticCommCallback(
   gtsam::Key r_prev = getRovKey('R', rov_id, current_rov_step - 1);
   gtsam::Key w_prev = getRovKey('W', rov_id, current_rov_step - 1);
 
-  double dt_rov = header_time - last_rov_timestamp_[rov_id];
+  double dt_rov = measurement_time - last_rov_timestamp_[rov_id];
   if (dt_rov <= 0.0) {
     RCLCPP_WARN(get_logger(),
-                "Non-positive ROV dt=%.6f for ROV %u (header=%.6f, last=%.6f), skipping acoustic update",
-                dt_rov, rov_id, header_time, last_rov_timestamp_[rov_id]);
+                "Non-positive ROV dt=%.6f for ROV %u (t_r=%.6f, last=%.6f), skipping acoustic update",
+                dt_rov, rov_id, measurement_time, last_rov_timestamp_[rov_id]);
     return;
   }
 
@@ -489,7 +490,7 @@ void FactorGraphTrackingNode::acousticCommCallback(
   isam2_.update(graph_, values_);
   graph_.resize(0);
   values_.clear();
-  last_rov_timestamp_[rov_id] = header_time;
+  last_rov_timestamp_[rov_id] = measurement_time;
   rov_step_counters_[rov_id]++;
 
   gtsam::Values final_est = isam2_.calculateEstimate();
@@ -573,7 +574,7 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
     graph_.add(boost::make_shared<PsudoRangeFactor>(
         asv_key, rKey, tof, speed_of_sound, body_P_sensor, acoustic_noise));
 
-    last_rov_timestamp_[rov_id] = header_time;
+    last_rov_timestamp_[rov_id] = t_r;
     rov_step_counters_[rov_id] = 0;
 
     // Now update iSAM2 with BOTH the ASV node (from getAsvKeyAtTime) AND the ROV initialization
