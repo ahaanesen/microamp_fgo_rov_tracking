@@ -70,7 +70,9 @@ private:
   // ==================== KEY HELPERS ====================
   gtsam::PreintegratedCombinedMeasurements getPimFromBuffer(
       double t_start, double t_end,
-      const gtsam::imuBias::ConstantBias& bias) const;
+      const gtsam::imuBias::ConstantBias& bias,
+      bool* integrated_any = nullptr,
+      double* integrated_dt = nullptr) const;
   gtsam::Key getAsvKeyAtTime(double target_time);
   gtsam::Key getRovKey(unsigned char prefix, uint32_t rov_id, uint32_t time_step);
 
