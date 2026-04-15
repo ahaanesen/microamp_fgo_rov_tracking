@@ -18,6 +18,13 @@ FactorGraphTrackingNode::FactorGraphTrackingNode()
   loadConfigurations();
   max_imu_buffer_duration_ = env_config_.imu_buffer_duration_sec;
 
+  // Initialize NED converter with default datum (can be overridden by first GNSS)
+  auto default_datum_lat = 60.3913;
+  auto default_datum_lon = 5.3221;
+  auto default_datum_h = 0.0;
+  ned_.setDatum(default_datum_lat, default_datum_lon, default_datum_h);
+  datum_initialised_ = true;
+
   // ------------------------------------------------------------------
   // IMU Preintegration (NED)
   // ------------------------------------------------------------------
@@ -133,16 +140,17 @@ void FactorGraphTrackingNode::initializeDatumFromGNSS(const GNSSNavPvt &msg) {
 }
 
 void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr msg) {
-  RCLCPP_INFO(get_logger(), "Received GNSS measurement at time %.2f with fix type %u and h_acc %f mm", 
-              rclcpp::Time(msg->header.stamp).seconds(), msg->fix_type, msg->h_acc);
+  RCLCPP_INFO(get_logger(), "Received GNSS measurement at time %.2f with lat=%.6f lon=%.6f h=%.2f fix_type=%u h_acc=%.2f", 
+              rclcpp::Time(msg->header.stamp).seconds(), msg->lat, msg->lon, msg->height, msg->fix_type, msg->h_acc);
   constexpr uint8_t FIX_3D = 3;
   if (msg->fix_type < FIX_3D || !msg->gnss_fix_ok) {
     return;
   }
 
-  if (!datum_initialised_) {
-    initializeDatumFromGNSS(*msg);
-  }
+  // See constructer for default datum init (for simulation only, real deployment should start with a good GNSS fix to set datum)
+  // if (!datum_initialised_) {
+  //   initializeDatumFromGNSS(*msg);
+  // }
 
   std::lock_guard<std::mutex> lock(graph_mutex_);
 
@@ -158,7 +166,7 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr msg) {
 
   double n, e, d;
   ned_.gnssToNED(msg->lat, msg->lon, msg->height, n, e, d);
-  double pos_sigma = std::clamp(static_cast<double>(msg->h_acc) / 1000.0,
+  double pos_sigma = std::clamp(static_cast<double>(msg->h_acc),
                                 fgo_config_.gps_sigma_floor, fgo_config_.gps_sigma_max);
 
   auto gps_noise = gtsam::noiseModel::Isotropic::Sigma(3, pos_sigma);
@@ -302,7 +310,7 @@ void FactorGraphTrackingNode::usblCallback(
   }
   
   // 1. ASV SIDE: Use the ASV state at acoustic receive time.
-  gtsam::Key asv_received = getAsvKeyAtTime(t_r);
+  gtsam::Key asv_received = getAsvKeyAtTime(last_asv_timestamp_);
 
   // 2. ROV SIDE: Handle the sequence
   uint32_t current_rov_step = rov_step_counters_[rov_id];
@@ -311,7 +319,7 @@ void FactorGraphTrackingNode::usblCallback(
   gtsam::Key r_prev = getRovKey('R', rov_id, current_rov_step - 1);
   gtsam::Key w_prev = getRovKey('W', rov_id, current_rov_step - 1);
 
-  double dt_rov = t_s - last_rov_timestamp_[rov_id];
+  double dt_rov = header_time - last_rov_timestamp_[rov_id];
   if (dt_rov <= 0.0) {
     RCLCPP_WARN(get_logger(),
                 "Non-positive ROV dt=%.6f for ROV %u (t_s=%.6f, last=%.6f), skipping USBL update",
@@ -364,7 +372,7 @@ void FactorGraphTrackingNode::usblCallback(
   isam2_.update(graph_, values_);
   graph_.resize(0);
   values_.clear();
-  last_rov_timestamp_[rov_id] = t_s;
+  last_rov_timestamp_[rov_id] = header_time;
   rov_step_counters_[rov_id]++;
 
   gtsam::Values final_est = isam2_.calculateEstimate();
@@ -381,11 +389,12 @@ void FactorGraphTrackingNode::acousticCommCallback(
   if (!graph_initialised_) {
     return;
   }
-
+  double header_time = rclcpp::Time(msg->header.stamp).seconds();
   uint8_t rov_id = msg->node_id;
   double sound_speed = env_config_.sound_speed;
-  double t_sent = msg->t_sent;
-  double t_received = msg->t_received;
+    // Use double for precision: (usec - usec) / 1e6
+  double t_s = static_cast<double>(msg->t_sent) / 1e6;
+  double t_r = static_cast<double>(msg->t_received) / 1e6;
 
   std::lock_guard<std::mutex> lock(graph_mutex_);
 
@@ -395,8 +404,7 @@ void FactorGraphTrackingNode::acousticCommCallback(
   }
   
   // 1. ASV SIDE: Create/Retrieve the ASV Pose at Time of Arrival (t_received)
-  double time = static_cast<double>(t_received) / 1e6;
-  auto asv_received = getAsvKeyAtTime(time);
+  auto asv_received = getAsvKeyAtTime(last_asv_timestamp_);
 
   // 2. ROV SIDE: Handle the sequence
   uint32_t current_rov_step = rov_step_counters_[rov_id];
@@ -405,14 +413,11 @@ void FactorGraphTrackingNode::acousticCommCallback(
   gtsam::Key r_prev = getRovKey('R', rov_id, current_rov_step - 1);
   gtsam::Key w_prev = getRovKey('W', rov_id, current_rov_step - 1);
 
-  // Use double for precision: (usec - usec) / 1e6
-  double t_s = static_cast<double>(msg->t_sent) / 1e6;
-  double t_r = static_cast<double>(msg->t_received) / 1e6;
-  double dt_rov = t_s - last_rov_timestamp_[rov_id];
+  double dt_rov = header_time - last_rov_timestamp_[rov_id];
   if (dt_rov <= 0.0) {
     RCLCPP_WARN(get_logger(),
-                "Non-positive ROV dt=%.6f for ROV %u (t_s=%.6f, last=%.6f), skipping acoustic update",
-                dt_rov, rov_id, t_s, last_rov_timestamp_[rov_id]);
+                "Non-positive ROV dt=%.6f for ROV %u (header=%.6f, last=%.6f), skipping acoustic update",
+                dt_rov, rov_id, header_time, last_rov_timestamp_[rov_id]);
     return;
   }
 
@@ -453,7 +458,7 @@ void FactorGraphTrackingNode::acousticCommCallback(
   isam2_.update(graph_, values_);
   graph_.resize(0);
   values_.clear();
-  last_rov_timestamp_[rov_id] = t_sent;
+  last_rov_timestamp_[rov_id] = header_time;
   rov_step_counters_[rov_id]++;
 
   gtsam::Values final_est = isam2_.calculateEstimate();
@@ -481,7 +486,7 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
         return;
     }
     
-    gtsam::Key asv_key = getAsvKeyAtTime(t_r);
+    gtsam::Key asv_key = getAsvKeyAtTime(last_asv_timestamp_);
     
     // DON'T update iSAM2 yet - we need to add the ROV initialization factors first
     // to avoid an underconstrained system. The ASV node created by getAsvKeyAtTime()
@@ -542,7 +547,7 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
     graph_.add(boost::make_shared<PsudoRangeFactor>(
         asv_key, rKey, tof, speed_of_sound, body_P_sensor, acoustic_noise));
 
-    last_rov_timestamp_[rov_id] = t_s;
+    last_rov_timestamp_[rov_id] = header_time;
     rov_step_counters_[rov_id] = 0;
 
     // Now update iSAM2 with BOTH the ASV node (from getAsvKeyAtTime) AND the ROV initialization
@@ -590,7 +595,7 @@ void FactorGraphTrackingNode::initializeGraphWithGNSS(const GNSSNavPvt::SharedPt
       gtsam::noiseModel::Isotropic::Sigma(6, fgo_config_.prior_bias_sigma)));
 
   // First GNSS constraint
-  double pos_sigma = std::clamp(static_cast<double>(msg->h_acc) / 1000.0,
+  double pos_sigma = std::clamp(static_cast<double>(msg->h_acc),
                                 fgo_config_.gps_sigma_floor, fgo_config_.gps_sigma_max);
   auto gps_noise = gtsam::noiseModel::Isotropic::Sigma(3, pos_sigma);
   graph_.add(gtsam::GPSFactor(X(0), gtsam::Point3(n, e, d), gps_noise));
@@ -636,6 +641,7 @@ void FactorGraphTrackingNode::publishBoatState(const gtsam::Values &est) {
   s.header.stamp = now();
   s.x = pose.translation().x();
   s.y = pose.translation().y();
+  s.z = pose.translation().z();
   s.yaw = yaw;
   s.surge = vel.x();
   s.sway = vel.y();

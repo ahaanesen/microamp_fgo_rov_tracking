@@ -58,11 +58,7 @@ class PlotterCSVJoint:
         self.asv_gt = _xyz(asv_gt_df, "x_n", "y_e", "z_d")
 
         self.rov_est = _xyz(rov_est_df, "x", "y", "z")
-        # ASV estimated only in xy plane, z assumed to be 0
-        asv_est_xy = _xyz(asv_est_df, "x", "y", "x")  # Use "x" as dummy for z
-        self.asv_est = asv_est_xy.copy()
-        self.asv_est[:, 2] = 0  # Set z to 0
-        # self.asv_est = _xyz(asv_est_df, "x", "y", "z")
+        self.asv_est = _xyz(asv_est_df, "x", "y", "z")
 
     def plot3d(self):
         self._load()
@@ -130,7 +126,7 @@ class PlotterCSVJoint:
 
         ax.grid(True)
 
-        ax.set_title(f"{self.scenario_name} — 3D Trajectories")
+        ax.set_title(f"FGO: {self.scenario_name} — 3D Trajectories")
         ax.legend(loc="upper right")
 
         fig.tight_layout()
@@ -147,10 +143,10 @@ class PlotterCSVJoint:
         plt.show(block=True)
 
 plotter = PlotterCSVJoint(
-    rov_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulated_data/scenario3/rov_ground_truth.csv",
-    asv_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulated_data/scenario3/asv_ground_truth.csv",
-    rov_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/scenario3/rov_estimated_20260414_112419.csv",
-    asv_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/scenario3/boat_estimated_20260414_112419.csv",
+    rov_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/simulated_data/rov_ground_truth.csv",
+    asv_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/simulated_data/asv_ground_truth.csv",
+    rov_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/scenario3/rov_estimated_20260415_140444.csv",
+    asv_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/scenario3/boat_estimated_20260415_140444.csv",
     scenario_name="Scenario 3",
     save_dir="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/plots/scenario3",
 )

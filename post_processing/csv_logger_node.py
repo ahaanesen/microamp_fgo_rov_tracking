@@ -36,7 +36,7 @@ class CSVLogger(Node):
         self.boat_file = open(csv_path / f'boat_estimated_{timestamp}.csv', 'w', newline='')
         self.boat_writer = csv.writer(self.boat_file)
         self.boat_writer.writerow([
-            'time', 'x', 'y', 'yaw', 'surge', 'sway', 'yaw_rate'
+            'time', 'x', 'y', 'z', 'yaw', 'surge', 'sway', 'yaw_rate'
         ])
 
         # Subscribers
@@ -77,6 +77,7 @@ class CSVLogger(Node):
             t,
             msg.x,
             msg.y,
+            msg.z,
             msg.yaw,
             msg.surge,
             msg.sway,
