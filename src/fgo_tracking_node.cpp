@@ -6,6 +6,22 @@
 #include <gtsam/nonlinear/NonlinearFactor.h>
 #include <gtsam/base/numericalDerivative.h>
 
+namespace {
+gtsam::Pose3 makeUsblBodyToSensor(const EnvConfig& env_config) {
+  const gtsam::Point3 usbl_offset(
+      env_config.usbl_offset_x,
+      env_config.usbl_offset_y,
+      env_config.usbl_offset_z);
+
+  const double roll_rad = env_config.usbl_roll_deg * M_PI / 180.0;
+  const double pitch_rad = env_config.usbl_pitch_deg * M_PI / 180.0;
+  const double yaw_rad = env_config.usbl_yaw_deg * M_PI / 180.0;
+  const gtsam::Rot3 usbl_rotation = gtsam::Rot3::RzRyRx(roll_rad, pitch_rad, yaw_rad);
+
+  return gtsam::Pose3(usbl_rotation, usbl_offset);
+}
+}  // namespace
+
 
 // ============================================================
 // CONSTRUCTOR, DESTRUCTOR, AND INITIALIZATION
@@ -197,16 +213,31 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr msg) {
 // ============================================================
 gtsam::PreintegratedCombinedMeasurements FactorGraphTrackingNode::getPimFromBuffer(
     double t_start, double t_end,
-    const gtsam::imuBias::ConstantBias& bias) const {
+    const gtsam::imuBias::ConstantBias& bias,
+    bool* integrated_any,
+    double* integrated_dt) const {
   gtsam::PreintegratedCombinedMeasurements sub_pim(pim_params_, bias);
+  bool any = false;
+  double dt_sum = 0.0;
   
   double last_t = t_start;
   for (const auto& data : imu_buffer_) {
       if (data.timestamp > t_start && data.timestamp <= t_end) {
           double dt = data.timestamp - last_t;
-          sub_pim.integrateMeasurement(data.acc, data.gyro, dt);
-          last_t = data.timestamp;
+          if (dt > 0.0) {
+            sub_pim.integrateMeasurement(data.acc, data.gyro, dt);
+            last_t = data.timestamp;
+            dt_sum += dt;
+            any = true;
+          }
       }
+  }
+
+  if (integrated_any != nullptr) {
+    *integrated_any = any;
+  }
+  if (integrated_dt != nullptr) {
+    *integrated_dt = dt_sum;
   }
   return sub_pim;
 }
@@ -247,7 +278,16 @@ gtsam::Key FactorGraphTrackingNode::getAsvKeyAtTime(double target_time) {
     auto prev_bias = isam2_.calculateEstimate<gtsam::imuBias::ConstantBias>(B(idx_prev));
 
     // 3. Bridge the gap using the IMU buffer with the parent node bias.
-    auto sub_pim = getPimFromBuffer(t_prev, target_time, prev_bias);
+    bool integrated_any = false;
+    double integrated_dt = 0.0;
+    auto sub_pim = getPimFromBuffer(t_prev, target_time, prev_bias, &integrated_any, &integrated_dt);
+    if (!integrated_any || integrated_dt <= 1e-6) {
+      RCLCPP_WARN(
+          get_logger(),
+          "No IMU samples available to bridge ASV from %.3f to %.3f. Reusing X(%lu) instead of creating unconstrained node.",
+          t_prev, target_time, idx_prev);
+      return X(idx_prev);
+    }
     
     // 4. Predict the state at target_time
     gtsam::NavState prev_state(prev_pose, prev_vel);
@@ -310,7 +350,7 @@ void FactorGraphTrackingNode::usblCallback(
   }
   
   // 1. ASV SIDE: Use the ASV state at acoustic receive time.
-  gtsam::Key asv_received = getAsvKeyAtTime(last_asv_timestamp_);
+  gtsam::Key asv_received = getAsvKeyAtTime(t_r);
 
   // 2. ROV SIDE: Handle the sequence
   uint32_t current_rov_step = rov_step_counters_[rov_id];
@@ -350,12 +390,7 @@ void FactorGraphTrackingNode::usblCallback(
 
   // 5. MEASUREMENT FACTORS
   // Add USBL factor
-  gtsam::Point3 usbl_offset(env_config_.usbl_offset_x, env_config_.usbl_offset_y, env_config_.usbl_offset_z);
-  double roll_rad = env_config_.usbl_roll_deg * M_PI / 180.0;
-  double pitch_rad = env_config_.usbl_pitch_deg * M_PI / 180.0;
-  double yaw_rad = env_config_.usbl_yaw_deg * M_PI / 180.0;
-  gtsam::Rot3 usbl_rotation = gtsam::Rot3::RzRyRx(roll_rad, pitch_rad, yaw_rad);
-  gtsam::Pose3 body_P_sensor(usbl_rotation, usbl_offset);
+  const gtsam::Pose3 body_P_sensor = makeUsblBodyToSensor(env_config_);
   auto usbl_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(2) << fgo_config_.usbl_azimuth_sigma, fgo_config_.usbl_elevation_sigma).finished());
   graph_.add(boost::make_shared<UsblFactor>(asv_received, r_curr, msg->azimuth, msg->elevation, body_P_sensor, usbl_noise));
 
@@ -404,7 +439,7 @@ void FactorGraphTrackingNode::acousticCommCallback(
   }
   
   // 1. ASV SIDE: Create/Retrieve the ASV Pose at Time of Arrival (t_received)
-  auto asv_received = getAsvKeyAtTime(last_asv_timestamp_);
+  auto asv_received = getAsvKeyAtTime(t_r);
 
   // 2. ROV SIDE: Handle the sequence
   uint32_t current_rov_step = rov_step_counters_[rov_id];
@@ -445,12 +480,7 @@ void FactorGraphTrackingNode::acousticCommCallback(
 
   // Add Acoustic Range factor (Psuedo-Range)
   double tof = t_r - t_s; 
-  gtsam::Point3 usbl_offset(env_config_.usbl_offset_x, env_config_.usbl_offset_y, env_config_.usbl_offset_z);
-  double roll_rad = env_config_.usbl_roll_deg * M_PI / 180.0;
-  double pitch_rad = env_config_.usbl_pitch_deg * M_PI / 180.0;
-  double yaw_rad = env_config_.usbl_yaw_deg * M_PI / 180.0;
-  gtsam::Rot3 usbl_rotation = gtsam::Rot3::RzRyRx(roll_rad, pitch_rad, yaw_rad);
-  gtsam::Pose3 body_P_sensor(usbl_rotation, usbl_offset);
+  const gtsam::Pose3 body_P_sensor = makeUsblBodyToSensor(env_config_);
   auto acoustic_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.acoustic_range_sigma / sound_speed); // Convert range sigma to time sigma using speed of sound
   graph_.add(boost::make_shared<PsudoRangeFactor>(asv_received, r_curr, tof, sound_speed, body_P_sensor, acoustic_noise)); // TODO: Change from hardcoded value
 
@@ -486,7 +516,7 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
         return;
     }
     
-    gtsam::Key asv_key = getAsvKeyAtTime(last_asv_timestamp_);
+    gtsam::Key asv_key = getAsvKeyAtTime(t_r);
     
     // DON'T update iSAM2 yet - we need to add the ROV initialization factors first
     // to avoid an underconstrained system. The ASV node created by getAsvKeyAtTime()
@@ -514,12 +544,7 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
                           r * sin(el));
 
     // Transform to world and force depth from the depth sensor (it's more reliable)
-    gtsam::Point3 usbl_offset(env_config_.usbl_offset_x, env_config_.usbl_offset_y, env_config_.usbl_offset_z);
-    double roll_rad = env_config_.usbl_roll_deg * M_PI / 180.0;
-    double pitch_rad = env_config_.usbl_pitch_deg * M_PI / 180.0;
-    double yaw_rad = env_config_.usbl_yaw_deg * M_PI / 180.0;
-    gtsam::Rot3 usbl_rotation = gtsam::Rot3::RzRyRx(roll_rad, pitch_rad, yaw_rad);
-    gtsam::Pose3 body_P_sensor(usbl_rotation, usbl_offset);
+    const gtsam::Pose3 body_P_sensor = makeUsblBodyToSensor(env_config_);
 
     gtsam::Point3 p_body = p_local;
     gtsam::Point3 p_world = world_T_asv.transformFrom(body_P_sensor.transformFrom(p_body));
