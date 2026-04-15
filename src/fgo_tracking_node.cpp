@@ -5,6 +5,7 @@
 #include <gtsam/geometry/Point3.h>
 #include <gtsam/nonlinear/NonlinearFactor.h>
 #include <gtsam/base/numericalDerivative.h>
+#include <cmath>
 
 namespace {
 gtsam::Pose3 makeUsblBodyToSensor(const EnvConfig& env_config) {
@@ -19,6 +20,14 @@ gtsam::Pose3 makeUsblBodyToSensor(const EnvConfig& env_config) {
   const gtsam::Rot3 usbl_rotation = gtsam::Rot3::RzRyRx(roll_rad, pitch_rad, yaw_rad);
 
   return gtsam::Pose3(usbl_rotation, usbl_offset);
+}
+
+double angleToRadians(double angle) {
+  // Support both degree and radian USBL message conventions.
+  if (std::abs(angle) > (2.0 * M_PI + 1e-3)) {
+    return angle * M_PI / 180.0;
+  }
+  return angle;
 }
 }  // namespace
 
@@ -534,8 +543,8 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
     }
 
     // Calculate local position from Az, El, Range
-    double az = (usbl->azimuth) * M_PI / 180.0;
-    double el = (usbl->elevation) * M_PI / 180.0;
+    double az = angleToRadians(usbl->azimuth);
+    double el = angleToRadians(usbl->elevation);
     double tof = (usbl->t_received - usbl->t_sent) / 1e6; // TODO: ensure this is in seconds with appropriate precision. might need to change either the seatrac driver or this conversion.
     double r  = tof * speed_of_sound; // Speed of sound in water ~1500 m/s
 
