@@ -38,6 +38,7 @@ struct FgoConfig {
   double gps_sigma_max{50.0};
 
   // ROV
+  double rov_cv_continous_sigma{0.5};  // m/s (how much we expect ROV velocity to change between timesteps)
   double rov_prior_pos_sigma{10.0};
   double rov_prior_vel_sigma{1.0};
   double rov_process_vel_sigma{0.5};

@@ -44,6 +44,7 @@ void declareAndLoadFgo(rclcpp::Node& node, FgoConfig& cfg) {
   LOAD_D(accel_noise); LOAD_D(gyro_noise); LOAD_D(accel_rw); LOAD_D(gyro_rw);
   LOAD_D(prior_pose_sigma); LOAD_D(prior_vel_sigma); LOAD_D(prior_bias_sigma);
   LOAD_D(gps_sigma_floor); LOAD_D(gps_sigma_max);
+  LOAD_D(rov_cv_continous_sigma);
   LOAD_D(rov_prior_pos_sigma); LOAD_D(rov_prior_vel_sigma); LOAD_D(rov_process_vel_sigma);
   LOAD_D(usbl_azimuth_sigma); LOAD_D(usbl_elevation_sigma);
   LOAD_D(acoustic_range_sigma); LOAD_D(rov_depth_sigma);

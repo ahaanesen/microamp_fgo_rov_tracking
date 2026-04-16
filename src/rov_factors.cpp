@@ -148,31 +148,52 @@ gtsam::NonlinearFactor::shared_ptr PsudoRangeFactor::clone() const {
 }
 
 ConstantVelocityFactor::ConstantVelocityFactor(
-    gtsam::Key p_t,
-    gtsam::Key v_t,
-    gtsam::Key p_t_plus_1,
+    gtsam::Key p_prev,
+    gtsam::Key v_prev,
+    gtsam::Key p_curr,
+    gtsam::Key v_curr,
     double dt,
     const gtsam::SharedNoiseModel& model)
-    : NoiseModelFactor3(model, p_t, v_t, p_t_plus_1), dt_(dt) {}
+    : NoiseModelFactor4(model, p_prev, v_prev, p_curr, v_curr), dt_(dt) {}
 
 gtsam::Vector ConstantVelocityFactor::evaluateError(
-    const gtsam::Point3& p_t,
-    const gtsam::Vector3& v_t,
-    const gtsam::Point3& p_next,
+    const gtsam::Point3& p_prev,
+    const gtsam::Vector3& v_prev,
+    const gtsam::Point3& p_curr,
+    const gtsam::Vector3& v_curr,
     boost::optional<gtsam::Matrix&> H1,
     boost::optional<gtsam::Matrix&> H2,
-    boost::optional<gtsam::Matrix&> H3) const {
+    boost::optional<gtsam::Matrix&> H3,
+    boost::optional<gtsam::Matrix&> H4) const {
+
+    gtsam::Matrix63 J_p_prev = gtsam::Matrix63::Zero();
+    gtsam::Matrix63 J_v_prev = gtsam::Matrix63::Zero();
+    gtsam::Matrix63 J_p_curr = gtsam::Matrix63::Zero();
+    gtsam::Matrix63 J_v_curr = gtsam::Matrix63::Zero();
+
+    J_p_prev.block<3, 3>(0, 0) = gtsam::Matrix33::Identity();
+    J_v_prev.block<3, 3>(0, 0) = gtsam::Matrix33::Identity() * dt_;
+    J_v_prev.block<3, 3>(3, 0) = gtsam::Matrix33::Identity();
+    J_p_curr.block<3, 3>(0, 0) = -gtsam::Matrix33::Identity();
+    J_v_curr.block<3, 3>(3, 0) = -gtsam::Matrix33::Identity();
     if (H1) {
-        *H1 = gtsam::Matrix33::Identity();
+        *H1 = J_p_prev;
+
     }
     if (H2) {
-        *H2 = gtsam::Matrix33::Identity() * dt_;
+        *H2 = J_v_prev;
     }
     if (H3) {
-        *H3 = -gtsam::Matrix33::Identity();
+        *H3 = J_p_curr;
+    }
+    if (H4) {
+        *H4 = J_v_curr;
     }
 
-    return (p_t + v_t * dt_) - p_next;
+    gtsam::Vector6 error;
+    error.head<3>() = (p_prev + v_prev * dt_) - p_curr;
+    error.tail<3>() = v_prev - v_curr;
+    return error;
 }
 
 gtsam::NonlinearFactor::shared_ptr ConstantVelocityFactor::clone() const {

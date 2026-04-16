@@ -62,19 +62,22 @@ private:
 	gtsam::Pose3 body_P_sensor_;
 };
 
-class ConstantVelocityFactor : public gtsam::NoiseModelFactor3<gtsam::Point3, gtsam::Vector3, gtsam::Point3> {
+class ConstantVelocityFactor : public gtsam::NoiseModelFactor4<gtsam::Point3, gtsam::Vector3, gtsam::Point3, gtsam::Vector3> {
 public:
-	ConstantVelocityFactor(gtsam::Key p_t, 
-                            gtsam::Key v_t, 
-                            gtsam::Key p_t_plus_1,
+	ConstantVelocityFactor(gtsam::Key p_prev, 
+                            gtsam::Key v_prev, 
+                            gtsam::Key p_curr,
+                            gtsam::Key v_curr,
                             double dt, 
                             const gtsam::SharedNoiseModel& model);
-	gtsam::Vector evaluateError(const gtsam::Point3& p_t, 
-                                const gtsam::Vector3& v_t, 
-                                const gtsam::Point3& p_next,
+	gtsam::Vector evaluateError(const gtsam::Point3& p_prev, 
+                                const gtsam::Vector3& v_prev, 
+                                const gtsam::Point3& p_curr,
+                                const gtsam::Vector3& v_curr,
                                 boost::optional<gtsam::Matrix&> H1 = boost::none,
                                 boost::optional<gtsam::Matrix&> H2 = boost::none,
-                                boost::optional<gtsam::Matrix&> H3 = boost::none) const override;
+                                boost::optional<gtsam::Matrix&> H3 = boost::none,
+                                boost::optional<gtsam::Matrix&> H4 = boost::none) const override;
 	gtsam::NonlinearFactor::shared_ptr clone() const override;
 private:
 	double dt_;

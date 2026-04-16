@@ -19,6 +19,7 @@ microamp_factor_graph_tracking:
       
       # ==================== ROV PARAMETERS ====================
       # ROV state priors (initial uncertainty when ROV first detected)
+      rov_cv_continous_sigma: 0.5  # m/s (how much we expect ROV velocity to change between timesteps)
       rov_prior_pos_sigma: 10.0    # metres (loose — we don't know where ROV is)
       rov_prior_vel_sigma: 1.0     # m/s (assume roughly stationary)
       
