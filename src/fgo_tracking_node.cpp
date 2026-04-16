@@ -16,7 +16,7 @@ gtsam::Pose3 makeUsblBodyToSensor(const EnvConfig& env_config) {
   const double roll_rad = env_config.usbl_roll_deg * M_PI / 180.0;
   const double pitch_rad = env_config.usbl_pitch_deg * M_PI / 180.0;
   const double yaw_rad = env_config.usbl_yaw_deg * M_PI / 180.0;
-  const gtsam::Rot3 usbl_rotation = gtsam::Rot3::RzRyRx(roll_rad, pitch_rad, yaw_rad);
+  const gtsam::Rot3 usbl_rotation = gtsam::Rot3::RzRyRx(yaw_rad, pitch_rad, roll_rad);
 
   return gtsam::Pose3(usbl_rotation, usbl_offset);
 }
@@ -171,6 +171,12 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr msg) {
   std::lock_guard<std::mutex> lock(graph_mutex_);
 
   if (!graph_initialised_) {
+    if (ne_init_ == std::tuple<double, double>{0.0, 0.0}) {
+      double n_init, e_init, d_init;
+      ned_.gnssToNED(msg->lat, msg->lon, msg->height, n_init, e_init, d_init);
+      ne_init_ = std::make_tuple(n_init, e_init);
+      return; // Wait for the next GNSS message to initialize the graph with a full pose (including heading)
+    }
     initializeGraphWithGNSS(msg);
     graph_initialised_ = true;
     return;
@@ -362,8 +368,8 @@ void FactorGraphTrackingNode::usblCallback(
   double dt_rov = header_time - last_rov_timestamp_[rov_id];
   if (dt_rov <= 0.0) {
     RCLCPP_WARN(get_logger(),
-                "Non-positive ROV dt=%.6f for ROV %u (t_s=%.6f, last=%.6f), skipping USBL update",
-                dt_rov, rov_id, t_s, last_rov_timestamp_[rov_id]);
+                "Non-positive ROV dt=%.6f for ROV %u (header_time=%.6f, last=%.6f), skipping USBL update",
+                dt_rov, rov_id, header_time, last_rov_timestamp_[rov_id]);
     return;
   }
 
@@ -534,21 +540,22 @@ void FactorGraphTrackingNode::initializeNewRov(uint8_t rov_id, Key rKey, Key wKe
     }
 
     // Calculate local position from Az, El, Range
-    double az = (usbl->azimuth) * M_PI / 180.0;
-    double el = (usbl->elevation) * M_PI / 180.0;
+    double az_rad = (usbl->azimuth) * M_PI / 180.0;
+    double el_rad = (usbl->elevation) * M_PI / 180.0;
     double tof = (usbl->t_received - usbl->t_sent) / 1e6; // TODO: ensure this is in seconds with appropriate precision. might need to change either the seatrac driver or this conversion.
     double r  = tof * speed_of_sound; // Speed of sound in water ~1500 m/s
 
-    gtsam::Point3 p_local(r * cos(el) * cos(az), 
-                          r * cos(el) * sin(az), 
-                          r * sin(el));
-
-    // Transform to world and force depth from the depth sensor (it's more reliable)
-    const gtsam::Pose3 body_P_sensor = makeUsblBodyToSensor(env_config_);
-
-    gtsam::Point3 p_body = p_local;
-    gtsam::Point3 p_world = world_T_asv.transformFrom(body_P_sensor.transformFrom(p_body));
-    p_world = gtsam::Point3(p_world.x(), p_world.y(), usbl->position.z);
+    gtsam::Pose3 body_P_sensor = makeUsblBodyToSensor(env_config_);
+    gtsam::Pose3 world_T_sensor = world_T_asv.compose(body_P_sensor);
+    gtsam::Point3 sensor_pos = world_T_sensor.translation();
+    // Direct NED coordinates of ROV:
+    gtsam::Point3 p_world(
+        sensor_pos.x() + r * std::cos(el_rad) * std::cos(az_rad),  // North
+        sensor_pos.y() + r * std::cos(el_rad) * std::sin(az_rad),  // East
+        usbl->position.z // sensor_pos.z() + r * std::sin(el_rad)                                      // Down (depth)
+    );
+    // Override depth with the reliable depth sensor:
+    // p_world = gtsam::Point3(p_world.x(), p_world.y(), usbl->position.z);
 
     values_.insert(rKey, p_world);
     values_.insert(wKey, gtsam::Vector3::Zero().eval());
@@ -603,7 +610,12 @@ void FactorGraphTrackingNode::initializeGraphWithGNSS(const GNSSNavPvt::SharedPt
   double n, e, d;
   ned_.gnssToNED(msg->lat, msg->lon, msg->height, n, e, d);
 
-  gtsam::Pose3 priorPose(gtsam::Rot3::RzRyRx(0, 0, 0), gtsam::Point3(n, e, d));
+  // TODO: take velocity into account for better initial guess. Currently assuming forward motion along init heading.
+  double delta_n = n - std::get<0>(ne_init_);
+  double delta_e = e - std::get<1>(ne_init_);
+  double initial_yaw = std::atan2(delta_e, delta_n); // Heading from the first two gnss points
+  gtsam::Rot3 initial_rot = gtsam::Rot3::Ypr(initial_yaw, 0.0, 0.0); //Ypr or Rz?
+  gtsam::Pose3 priorPose(initial_rot, gtsam::Point3(n, e, d));
   gtsam::Vector3 priorVel(0.0, 0.0, 0.0);
   gtsam::imuBias::ConstantBias priorBias;
 

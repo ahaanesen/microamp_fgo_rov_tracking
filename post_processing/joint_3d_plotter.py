@@ -16,7 +16,9 @@ def _load_csv(path):
 
 
 def _gt_time(df):
-    return df["t_ros_sec"].to_numpy() + df["t_ros_ns"].to_numpy() * 1e-9
+    if "t_ros_ns" in df.columns:
+        return df["t_ros_ns"].to_numpy(dtype=float) * 1e-9
+    return df["t_ros_sec"].to_numpy(dtype=float)
 
 
 def _xyz(df, x, y, z):
@@ -138,15 +140,15 @@ class PlotterCSVJoint:
         if self.save_dir:
             path = Path(self.save_dir)
             path.mkdir(parents=True, exist_ok=True)
-            fig.savefig(path / "3d_joint.png", dpi=150, bbox_inches="tight")
+            fig.savefig(path / "3d_joint_new.png", dpi=150, bbox_inches="tight")
 
         plt.show(block=True)
 
 plotter = PlotterCSVJoint(
-    rov_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/simulated_data/rov_ground_truth.csv",
-    asv_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/simulated_data/asv_ground_truth.csv",
-    rov_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/scenario3/rov_estimated_20260415_140444.csv",
-    asv_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/scenario3/boat_estimated_20260415_140444.csv",
+    rov_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/rov_ground_truth.csv",
+    asv_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/asv_ground_truth.csv",
+    rov_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/scenario3/rov_estimated_20260416_090058.csv",
+    asv_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/scenario3/boat_estimated_20260416_090058.csv",
     scenario_name="Scenario 3",
     save_dir="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/plots/scenario3",
 )

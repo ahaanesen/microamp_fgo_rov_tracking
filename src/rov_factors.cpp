@@ -32,22 +32,17 @@ Vector UsblFactor::evaluateError(
     const gtsam::Point3& rovPoint,
     boost::optional<gtsam::Matrix&> H_asv,
     boost::optional<gtsam::Matrix&> H_rov) const {
+    // USBL azimuth/elevation are reported in world NED, not in the sensor/body frame.
+    // Model the measurement directly from the world-frame ASV->ROV vector.
+    (void)body_P_sensor_;
     double measAzimuthRad = measuredAzimuth_ * M_PI / 180.0;
     double measElevationRad = measuredElevation_ * M_PI / 180.0;
 
-    gtsam::Matrix66 H_pose_asv;
-    gtsam::Pose3 world_P_sensor = asvPose.compose(body_P_sensor_, H_asv ? &H_pose_asv : nullptr);
+    gtsam::Vector3 p_world = rovPoint - asvPose.translation();
 
-    gtsam::Matrix36 H_local_sensor;
-    gtsam::Matrix33 H_local_rov;
-    gtsam::Point3 p_local = world_P_sensor.transformTo(
-        rovPoint,
-        H_asv ? &H_local_sensor : nullptr,
-        H_rov ? &H_local_rov : nullptr);
-
-    double x = p_local.x();
-    double y = p_local.y();
-    double z = p_local.z();
+    double x = p_world.x();
+    double y = p_world.y();
+    double z = p_world.z();
     double r2 = x * x + y * y;
     double r = std::sqrt(r2);
     double rho2 = r2 + z * z;
@@ -62,18 +57,20 @@ Vector UsblFactor::evaluateError(
     double errAz = wrapToPi(expAz - measAzimuthRad);
     double errEl = expEl - measElevationRad;
 
-    gtsam::Matrix23 H_angles_local = gtsam::Matrix23::Zero();
+    gtsam::Matrix23 H_angles_world = gtsam::Matrix23::Zero();
     if (r2 > epsilon && r > epsilon && rho2 > epsilon) {
-        H_angles_local << -y / r2, x / r2, 0.0,
+        H_angles_world << -y / r2, x / r2, 0.0,
                           -x * z / (rho2 * r), -y * z / (rho2 * r), r / rho2;
     }
 
     if (H_asv) {
-        *H_asv = H_angles_local * H_local_sensor * H_pose_asv;
+        gtsam::Matrix26 H_err_pose = gtsam::Matrix26::Zero();
+        H_err_pose.block<2, 3>(0, 3) = -H_angles_world;
+        *H_asv = H_err_pose;
     }
 
     if (H_rov) {
-        *H_rov = H_angles_local * H_local_rov;
+        *H_rov = H_angles_world;
     }
 
     return (gtsam::Vector(2) << errAz, errEl).finished();

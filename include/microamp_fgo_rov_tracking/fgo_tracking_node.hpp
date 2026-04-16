@@ -84,6 +84,7 @@ private:
   gtsam::Values values_;
   std::mutex graph_mutex_;
   bool graph_initialised_;
+  std::tuple<double, double> ne_init_; // Initial N and E for heading initialization
   
   std::map<double, gtsam::Key> asv_timeline_; // Maps timestamp (seconds) to the GTSAM Key for the ASV
   uint64_t asv_index_; // Counter for the ASV symbol index
