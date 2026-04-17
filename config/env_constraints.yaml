@@ -1,8 +1,13 @@
 microamp_factor_graph_tracking:
   ros__parameters:
     env:
+      imu_rate_hz: 100.0
+      gnss_rate_hz: 1.0
+      usbl_rate_hz: 0.2
+
       gravity: 9.82145996
       sound_speed: 1500.0
+      
       usbl_offset:
         x: 0.0
         y: 0.0

@@ -1,6 +1,12 @@
 #pragma once
 #include <cmath>
 
+struct NedCoordinates {
+    double n; // North
+    double e; // East
+    double d; // Down
+};
+
 struct NedConverter
 {
     // Datum (lat0, lon0 in rad, h0 in meters)
@@ -35,8 +41,7 @@ struct NedConverter
     }
 
     // Convert a GNSS fix to local NED coordinates
-    void gnssToNED(double lat_deg, double lon_deg, double h_m,
-                   double &n, double &e, double &d)
+    NedCoordinates gnssToNED(double lat_deg, double lon_deg, double h_m)
     {
         double lat = lat_deg * M_PI / 180.0;
         double lon = lon_deg * M_PI / 180.0;
@@ -57,6 +62,7 @@ struct NedConverter
         double dy = y - y0;
         double dz = z - z0;
 
+        double n, e, d;
         // Rotate ECEF → NED
         n =  -sin_lat0 * cos_lon0 * dx
              -sin_lat0 * sin_lon0 * dy
@@ -68,6 +74,7 @@ struct NedConverter
         d =  -cos_lat0 * cos_lon0 * dx
              -cos_lat0 * sin_lon0 * dy
              -sin_lat0 * dz;
+        return NedCoordinates{n, e, d};
     }
 
 private:

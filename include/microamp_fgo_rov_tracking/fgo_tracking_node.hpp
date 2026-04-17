@@ -13,7 +13,6 @@
 #include <gtsam/slam/PriorFactor.h>
 
 #include <memory>
-#include <mutex>
 #include <deque>
 
 #include "rclcpp/rclcpp.hpp"
@@ -28,6 +27,15 @@
 
 #include "ned_converter.hpp"
 #include "config.hpp"
+
+// For simulation purposes, we can define different scenarios with different measurement types. 
+// This can be used to test the factor graph in different conditions and with different sensor availability.
+enum scenarios {
+  bearing_only = 1,
+  bearing_range = 2,
+  bearing_range_depth = 3
+};
+constexpr uint8_t SCENARIO_ID = bearing_range; 
 
 using gtsam::symbol_shorthand::B; // Bias  (b)
 using gtsam::symbol_shorthand::V; // Velocity (v)
@@ -64,17 +72,12 @@ private:
   // ==================== ROV STATE ====================
   void usblCallback(const USBLMessage::SharedPtr msg);
   void acousticCommCallback(const AcousticCommReceive::SharedPtr msg);
-  void initializeNewRov(uint8_t rov_id, Key rKey, Key wKey, const USBLMessage::SharedPtr& usbl, double speed_of_sound);
+  void initializeNewRov(gtsam::Key associated_asv_key, const USBLMessage::SharedPtr& usbl_msg);
   void publishROVState(const gtsam::Values &est);
 
-  // ==================== KEY HELPERS ====================
-  gtsam::PreintegratedCombinedMeasurements getPimFromBuffer(
-      double t_start, double t_end,
-      const gtsam::imuBias::ConstantBias& bias,
-      bool* integrated_any = nullptr,
-      double* integrated_dt = nullptr) const;
-  gtsam::Key getAsvKeyAtTime(double target_time);
-  gtsam::Key getRovKey(unsigned char prefix, uint32_t rov_id, uint32_t time_step);
+  gtsam::Key getRovKey(unsigned char prefix, uint32_t rov_id, uint32_t step_count);
+  gtsam::Key getAsvKeyForRovAssociation(double current_asv_time, uint64_t current_asv_index, double rov_time);
+  void rovUpdateWithUsbl(uint8_t rov_id, double rov_time, gtsam::Key associated_asv_key, const USBLMessage::SharedPtr& usbl_msg);
 
   // ==================== GTSAM CORE ====================
   gtsam::Values updateAndGetEstimate();
@@ -82,9 +85,8 @@ private:
   gtsam::ISAM2 isam2_;
   gtsam::NonlinearFactorGraph graph_;
   gtsam::Values values_;
-  std::mutex graph_mutex_;
   bool graph_initialised_;
-  std::tuple<double, double> ne_init_; // Initial N and E for heading initialization
+  std::tuple<double, double> ne_init_; // Initial N and E for heading initialization TODO: add velocity as well
   
   std::map<double, gtsam::Key> asv_timeline_; // Maps timestamp (seconds) to the GTSAM Key for the ASV
   uint64_t asv_index_; // Counter for the ASV symbol index
@@ -102,21 +104,14 @@ private:
 
   NedConverter ned_;
   bool datum_initialised_;
-  bool imu_initialised_ = false;
 
+  bool imu_initialised_ = false;
   rclcpp::Time last_imu_time_; 
   double last_gyro_z_ = 0.0; // Latest raw gyro z for yaw-rate output (bias correction applied later)
+  
+   // ==================== ROV TRACKING ====================
+   std::deque<USBLMessage::SharedPtr> usbl_queue_; // Queue for incoming USBL messages (timestamp, message)
 
-  // ==================== IMU buffer ====================
-  struct ImuMeasurement {
-    double timestamp;
-    gtsam::Vector3 acc;
-    gtsam::Vector3 gyro;
-  };
-
-   // IMU buffer for out of order handling for ROV measurements
-  std::deque<ImuMeasurement> imu_buffer_; // Use a deque for efficient pushing to back and popping from front
-  double max_imu_buffer_duration_ = 10.0; // seconds, adjust as needed
 
   // ==================== PARAMETERS ====================
   EnvConfig env_config_;

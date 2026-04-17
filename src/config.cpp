@@ -18,6 +18,9 @@ void declareAndLoadTopics(rclcpp::Node& node, TopicsConfig& cfg) {
 }
 
 void declareAndLoadEnv(rclcpp::Node& node, EnvConfig& cfg) {
+  node.declare_parameter("env.imu_rate_hz", cfg.imu_rate_hz);
+  node.declare_parameter("env.gnss_rate_hz", cfg.gnss_rate_hz);
+  node.declare_parameter("env.usbl_rate_hz", cfg.usbl_rate_hz);
   node.declare_parameter("env.gravity", cfg.gravity);
   node.declare_parameter("env.sound_speed", cfg.sound_speed);
   node.declare_parameter("env.usbl_offset.x", cfg.usbl_offset_x);
@@ -28,6 +31,9 @@ void declareAndLoadEnv(rclcpp::Node& node, EnvConfig& cfg) {
   node.declare_parameter("env.usbl_rpy_deg.yaw", cfg.usbl_yaw_deg);
   node.declare_parameter("env.imu_buffer_duration_sec", cfg.imu_buffer_duration_sec);
 
+  cfg.imu_rate_hz = node.get_parameter("env.imu_rate_hz").as_double();
+  cfg.gnss_rate_hz = node.get_parameter("env.gnss_rate_hz").as_double();
+  cfg.usbl_rate_hz = node.get_parameter("env.usbl_rate_hz").as_double();
   cfg.gravity = node.get_parameter("env.gravity").as_double();
   cfg.sound_speed = node.get_parameter("env.sound_speed").as_double();
   cfg.usbl_offset_x = node.get_parameter("env.usbl_offset.x").as_double();

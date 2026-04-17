@@ -13,6 +13,10 @@ struct TopicsConfig {
 };
 
 struct EnvConfig {
+    double imu_rate_hz{100.0}; 
+    double gnss_rate_hz{1.0}; 
+    double usbl_rate_hz{0.2}; 
+
     double gravity{9.82145996};
     double sound_speed{1500.0};
     double usbl_offset_x{0.0};
