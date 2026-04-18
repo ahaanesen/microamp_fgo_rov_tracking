@@ -23,6 +23,7 @@ void declareAndLoadEnv(rclcpp::Node& node, EnvConfig& cfg) {
   node.declare_parameter("env.usbl_rate_hz", cfg.usbl_rate_hz);
   node.declare_parameter("env.gravity", cfg.gravity);
   node.declare_parameter("env.sound_speed", cfg.sound_speed);
+  node.declare_parameter("env.gps_offset", cfg.gps_offset);
   node.declare_parameter("env.usbl_offset.x", cfg.usbl_offset_x);
   node.declare_parameter("env.usbl_offset.y", cfg.usbl_offset_y);
   node.declare_parameter("env.usbl_offset.z", cfg.usbl_offset_z);
@@ -36,6 +37,7 @@ void declareAndLoadEnv(rclcpp::Node& node, EnvConfig& cfg) {
   cfg.usbl_rate_hz = node.get_parameter("env.usbl_rate_hz").as_double();
   cfg.gravity = node.get_parameter("env.gravity").as_double();
   cfg.sound_speed = node.get_parameter("env.sound_speed").as_double();
+  cfg.gps_offset = node.get_parameter("env.gps_offset").as_double_array();
   cfg.usbl_offset_x = node.get_parameter("env.usbl_offset.x").as_double();
   cfg.usbl_offset_y = node.get_parameter("env.usbl_offset.y").as_double();
   cfg.usbl_offset_z = node.get_parameter("env.usbl_offset.z").as_double();

@@ -8,6 +8,7 @@
 
 class UsblFactor : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Point3> {
 public:
+    using Base = gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Point3>;
 	using shared_ptr = std::shared_ptr<UsblFactor>;
 	UsblFactor(gtsam::Key asvKey, 
                 gtsam::Key rovKey, 
@@ -18,8 +19,8 @@ public:
 	~UsblFactor() override = default;
 	gtsam::Vector evaluateError(const gtsam::Pose3& asvPose, 
                                 const gtsam::Point3& rovPoint,
-                                boost::optional<gtsam::Matrix&> H_asv = boost::none,
-                                boost::optional<gtsam::Matrix&> H_rov = boost::none) const override;
+                                typename Base::template OptionalMatrixTypeT<gtsam::Pose3> H_asv = nullptr,
+                                typename Base::template OptionalMatrixTypeT<gtsam::Point3> H_rov = nullptr) const override;
 	gtsam::NonlinearFactor::shared_ptr clone() const override;
 private:
 	double measuredAzimuth_;
@@ -29,13 +30,14 @@ private:
 
 class DepthFactor : public gtsam::NoiseModelFactor1<gtsam::Point3> {
 public:
+    using Base = gtsam::NoiseModelFactor1<gtsam::Point3>;
 	using shared_ptr = std::shared_ptr<DepthFactor>;
 	DepthFactor(gtsam::Key rovKey, 
                 double measuredDepth, 
                 const gtsam::SharedNoiseModel& model);
 	~DepthFactor() override = default;
 	gtsam::Vector evaluateError(const gtsam::Point3& rovPoint,
-								boost::optional<gtsam::Matrix&> H = boost::none) const override;
+								typename Base::template OptionalMatrixTypeT<gtsam::Point3> H = nullptr) const override;
 	gtsam::NonlinearFactor::shared_ptr clone() const override;
 private:
 	double measuredDepth_;
@@ -43,6 +45,7 @@ private:
 
 class PsudoRangeFactor : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Point3> {
 public:
+    using Base = gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Point3>;
 	using shared_ptr = std::shared_ptr<PsudoRangeFactor>;
 	PsudoRangeFactor(gtsam::Key asvKey, 
                     gtsam::Key rovKey, 
@@ -53,8 +56,8 @@ public:
 	~PsudoRangeFactor() override = default;
 	gtsam::Vector evaluateError(const gtsam::Pose3& asvPose,
                                 const gtsam::Point3& rovPoint,
-                                boost::optional<gtsam::Matrix&> H_asv = boost::none,
-                                boost::optional<gtsam::Matrix&> H_rov = boost::none) const override;
+                                typename Base::template OptionalMatrixTypeT<gtsam::Pose3> H_asv = nullptr,
+                                typename Base::template OptionalMatrixTypeT<gtsam::Point3> H_rov = nullptr) const override;
 	gtsam::NonlinearFactor::shared_ptr clone() const override;
 private:
 	double measuredTOF_;
@@ -64,6 +67,8 @@ private:
 
 class ConstantVelocityFactor : public gtsam::NoiseModelFactor4<gtsam::Point3, gtsam::Vector3, gtsam::Point3, gtsam::Vector3> {
 public:
+    using Base = gtsam::NoiseModelFactor4<gtsam::Point3, gtsam::Vector3, gtsam::Point3, gtsam::Vector3>;
+    using shared_ptr = std::shared_ptr<ConstantVelocityFactor>;
 	ConstantVelocityFactor(gtsam::Key p_prev, 
                             gtsam::Key v_prev, 
                             gtsam::Key p_curr,
@@ -74,10 +79,10 @@ public:
                                 const gtsam::Vector3& v_prev, 
                                 const gtsam::Point3& p_curr,
                                 const gtsam::Vector3& v_curr,
-                                boost::optional<gtsam::Matrix&> H1 = boost::none,
-                                boost::optional<gtsam::Matrix&> H2 = boost::none,
-                                boost::optional<gtsam::Matrix&> H3 = boost::none,
-                                boost::optional<gtsam::Matrix&> H4 = boost::none) const override;
+                                typename Base::template OptionalMatrixTypeT<gtsam::Point3> H1 = nullptr,
+                                typename Base::template OptionalMatrixTypeT<gtsam::Vector3> H2 = nullptr,
+                                typename Base::template OptionalMatrixTypeT<gtsam::Point3> H3 = nullptr,
+                                typename Base::template OptionalMatrixTypeT<gtsam::Vector3> H4 = nullptr) const override;
 	gtsam::NonlinearFactor::shared_ptr clone() const override;
 private:
 	double dt_;

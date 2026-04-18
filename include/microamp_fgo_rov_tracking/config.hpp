@@ -19,9 +19,10 @@ struct EnvConfig {
 
     double gravity{9.82145996};
     double sound_speed{1500.0};
+    std::vector<double> gps_offset{0.3, 0.3, 0.1}; // x, y, z offsets for GPS antenna from ASV center (in meters)
     double usbl_offset_x{0.0};
     double usbl_offset_y{0.0};
-    double usbl_offset_z{1.5};
+    double usbl_offset_z{1.2};
 
     double usbl_roll_deg{0.0};
     double usbl_pitch_deg{0.0};

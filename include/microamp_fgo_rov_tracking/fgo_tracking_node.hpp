@@ -35,7 +35,7 @@ enum scenarios {
   bearing_range = 2,
   bearing_range_depth = 3
 };
-constexpr uint8_t SCENARIO_ID = bearing_range; 
+constexpr uint8_t SCENARIO_ID = bearing_range_depth; 
 
 using gtsam::symbol_shorthand::B; // Bias  (b)
 using gtsam::symbol_shorthand::V; // Velocity (v)
@@ -98,7 +98,7 @@ private:
 
   // ==================== ASV NAVIGATION ====================
   std::unique_ptr<gtsam::PreintegratedCombinedMeasurements> pim_;
-  boost::shared_ptr<gtsam::PreintegrationCombinedParams> pim_params_;
+  std::shared_ptr<gtsam::PreintegrationCombinedParams> pim_params_;
   gtsam::imuBias::ConstantBias bias_;
   double gravity_;
 

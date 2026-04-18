@@ -30,8 +30,8 @@ UsblFactor::UsblFactor(
 Vector UsblFactor::evaluateError(
     const gtsam::Pose3& asvPose,
     const gtsam::Point3& rovPoint,
-    boost::optional<gtsam::Matrix&> H_asv,
-    boost::optional<gtsam::Matrix&> H_rov) const {
+    typename Base::template OptionalMatrixTypeT<gtsam::Pose3> H_asv,
+    typename Base::template OptionalMatrixTypeT<gtsam::Point3> H_rov) const {
     // USBL azimuth/elevation are reported in world NED, not in the sensor/body frame.
     // Model the measurement directly from the world-frame ASV->ROV vector.
     (void)body_P_sensor_;
@@ -77,8 +77,8 @@ Vector UsblFactor::evaluateError(
 }
 
 gtsam::NonlinearFactor::shared_ptr UsblFactor::clone() const {
-    return boost::static_pointer_cast<gtsam::NonlinearFactor>(
-        gtsam::NonlinearFactor::shared_ptr(new UsblFactor(*this)));
+    return std::static_pointer_cast<gtsam::NonlinearFactor>(
+        std::make_shared<UsblFactor>(*this));
 }
 
 DepthFactor::DepthFactor(
@@ -90,7 +90,7 @@ DepthFactor::DepthFactor(
 
 gtsam::Vector DepthFactor::evaluateError(
     const gtsam::Point3& rovPoint,
-    boost::optional<gtsam::Matrix&> H) const {
+    typename Base::template OptionalMatrixTypeT<gtsam::Point3> H) const {
     if (H) {
         *H = (gtsam::Matrix13() << 0.0, 0.0, 1.0).finished();
     }
@@ -98,8 +98,8 @@ gtsam::Vector DepthFactor::evaluateError(
 }
 
 gtsam::NonlinearFactor::shared_ptr DepthFactor::clone() const {
-    return boost::static_pointer_cast<gtsam::NonlinearFactor>(
-        gtsam::NonlinearFactor::shared_ptr(new DepthFactor(*this)));
+    return std::static_pointer_cast<gtsam::NonlinearFactor>(
+        std::make_shared<DepthFactor>(*this));
 }
 
 PsudoRangeFactor::PsudoRangeFactor(
@@ -117,8 +117,8 @@ PsudoRangeFactor::PsudoRangeFactor(
 Vector PsudoRangeFactor::evaluateError(
     const gtsam::Pose3& asvPose,
     const gtsam::Point3& rovPoint,
-    boost::optional<gtsam::Matrix&> H_asv,
-    boost::optional<gtsam::Matrix&> H_rov) const {
+    typename Base::template OptionalMatrixTypeT<gtsam::Pose3> H_asv,
+    typename Base::template OptionalMatrixTypeT<gtsam::Point3> H_rov) const {
     gtsam::Matrix66 H_pose_asv;
     gtsam::Pose3 world_P_sensor = asvPose.compose(body_P_sensor_, H_asv ? &H_pose_asv : nullptr);
 
@@ -143,8 +143,8 @@ Vector PsudoRangeFactor::evaluateError(
 }
 
 gtsam::NonlinearFactor::shared_ptr PsudoRangeFactor::clone() const {
-    return boost::static_pointer_cast<gtsam::NonlinearFactor>(
-        gtsam::NonlinearFactor::shared_ptr(new PsudoRangeFactor(*this)));
+    return std::static_pointer_cast<gtsam::NonlinearFactor>(
+        std::make_shared<PsudoRangeFactor>(*this));
 }
 
 ConstantVelocityFactor::ConstantVelocityFactor(
@@ -161,10 +161,10 @@ gtsam::Vector ConstantVelocityFactor::evaluateError(
     const gtsam::Vector3& v_prev,
     const gtsam::Point3& p_curr,
     const gtsam::Vector3& v_curr,
-    boost::optional<gtsam::Matrix&> H1,
-    boost::optional<gtsam::Matrix&> H2,
-    boost::optional<gtsam::Matrix&> H3,
-    boost::optional<gtsam::Matrix&> H4) const {
+    typename Base::template OptionalMatrixTypeT<gtsam::Point3> H1,
+    typename Base::template OptionalMatrixTypeT<gtsam::Vector3> H2,
+    typename Base::template OptionalMatrixTypeT<gtsam::Point3> H3,
+    typename Base::template OptionalMatrixTypeT<gtsam::Vector3> H4) const {
 
     gtsam::Matrix63 J_p_prev = gtsam::Matrix63::Zero();
     gtsam::Matrix63 J_v_prev = gtsam::Matrix63::Zero();
@@ -197,6 +197,6 @@ gtsam::Vector ConstantVelocityFactor::evaluateError(
 }
 
 gtsam::NonlinearFactor::shared_ptr ConstantVelocityFactor::clone() const {
-    return boost::static_pointer_cast<gtsam::NonlinearFactor>(
-        gtsam::NonlinearFactor::shared_ptr(new ConstantVelocityFactor(*this)));
+    return std::static_pointer_cast<gtsam::NonlinearFactor>(
+        std::make_shared<ConstantVelocityFactor>(*this));
 }

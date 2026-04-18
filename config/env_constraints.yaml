@@ -7,11 +7,17 @@ microamp_factor_graph_tracking:
 
       gravity: 9.82145996
       sound_speed: 1500.0
+
+      gps_offset: [
+         0.3,  # x
+         0.3,  # y
+         0.1   # z
+      ]
       
       usbl_offset:
         x: 0.0
         y: 0.0
-        z: 1.5
+        z: 1.2
       usbl_rpy_deg:
         roll: 0.0
         pitch: 0.0

@@ -200,7 +200,8 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
   double pos_sigma = std::clamp(static_cast<double>(gnss_msg->h_acc),
                                 fgo_config_.gps_sigma_floor, fgo_config_.gps_sigma_max);
   auto gps_noise = gtsam::noiseModel::Isotropic::Sigma(3, pos_sigma);
-  graph_.add(gtsam::GPSFactor(X(curr_asv_index), gtsam::Point3(ned_coords.n, ned_coords.e, ned_coords.d), gps_noise));
+  auto gps_leverarm = gtsam::Point3(env_config_.gps_offset[0], env_config_.gps_offset[1], env_config_.gps_offset[2]);
+  graph_.add(gtsam::GPSFactorArm(X(curr_asv_index), gtsam::Point3(ned_coords.n, ned_coords.e, ned_coords.d), gps_leverarm, gps_noise));
 
 
   // 5. Process pending USBL measurements and add corresponding factors for associated ROV nodes
@@ -330,26 +331,26 @@ void FactorGraphTrackingNode::rovUpdateWithUsbl(uint8_t rov_id,
   cov.block<3,3>(3,0) = gtsam::Matrix33::Identity() * (q * std::pow(dt_rov, 2) / 2.0);
   cov.block<3,3>(3,3) = gtsam::Matrix33::Identity() * (q * dt_rov);
   auto cv_noise = gtsam::noiseModel::Gaussian::Covariance(cov);
-  graph_.add(boost::make_shared<ConstantVelocityFactor>(r_prev, w_prev, r_curr, w_curr, dt_rov, cv_noise));
+  graph_.add(std::make_shared<ConstantVelocityFactor>(r_prev, w_prev, r_curr, w_curr, dt_rov, cv_noise));
 
   // Add USBL factor between ASV node and new ROV node
   auto body_P_sensor = getBodyToUsblPose(env_config_);
   auto usbl_noise = gtsam::noiseModel::Diagonal::Sigmas(
     (gtsam::Vector(2) << fgo_config_.usbl_azimuth_sigma, fgo_config_.usbl_elevation_sigma).finished());
-  graph_.add(boost::make_shared<UsblFactor>(
+  graph_.add(std::make_shared<UsblFactor>(
     associated_asv_key, r_curr, usbl_msg->azimuth, usbl_msg->elevation, body_P_sensor, usbl_noise));
   
   if (SCENARIO_ID >= bearing_range) {
     // Add acoustic range factor between ASV and ROV
     auto tof = (usbl_msg->t_received - usbl_msg->t_sent) / 1e6; // Convert microseconds to seconds
     auto acoustic_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.acoustic_range_sigma / env_config_.sound_speed); // Convert range sigma to time-of-flight sigma
-    graph_.add(boost::make_shared<PsudoRangeFactor>(
+    graph_.add(std::make_shared<PsudoRangeFactor>(
       associated_asv_key, r_curr, tof, env_config_.sound_speed, body_P_sensor, acoustic_noise));
   }
   if (SCENARIO_ID >= bearing_range_depth) {
     // Add depth factor for ROV
     auto depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.rov_depth_sigma);
-    graph_.add(boost::make_shared<DepthFactor>(r_curr, usbl_msg->position.z, depth_noise));
+    graph_.add(std::make_shared<DepthFactor>(r_curr, usbl_msg->position.z, depth_noise));
   }
 
   RCLCPP_INFO(get_logger(), "Added new ROV node for ROV ID %d at time %.2f with associated ASV node at time %.2f based on USBL measurement sent at %.2f (received at %.2f)", 
@@ -369,7 +370,7 @@ void FactorGraphTrackingNode::usblCallback(const USBLMessage::SharedPtr msg) {
 // TODO: fix to match USBL pattern
 void FactorGraphTrackingNode::acousticCommCallback(
     const AcousticCommReceive::SharedPtr msg) {
-
+  (void)msg;
 }
 
 // ============================================================
@@ -424,20 +425,20 @@ void FactorGraphTrackingNode::initializeNewRov(gtsam::Key associated_asv_key, co
   // Add USBL factor for this initial measurement
   auto usbl_noise = gtsam::noiseModel::Diagonal::Sigmas(
     (gtsam::Vector(2) << fgo_config_.usbl_azimuth_sigma, fgo_config_.usbl_elevation_sigma).finished());
-  graph_.add(boost::make_shared<UsblFactor>(
+  graph_.add(std::make_shared<UsblFactor>(
     associated_asv_key, rKey, usbl_msg->azimuth, usbl_msg->elevation, body_P_sensor, usbl_noise));
   
   if (SCENARIO_ID >= bearing_range) {
     // Add acoustic range factor between ASV and ROV
     auto tof = (usbl_msg->t_received - usbl_msg->t_sent) / 1e6; // Convert microseconds to seconds
     auto acoustic_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.acoustic_range_sigma / env_config_.sound_speed); // Convert range sigma to time-of-flight sigma
-    graph_.add(boost::make_shared<PsudoRangeFactor>(
+    graph_.add(std::make_shared<PsudoRangeFactor>(
       associated_asv_key, rKey, tof, env_config_.sound_speed, body_P_sensor, acoustic_noise));
   }
   if (SCENARIO_ID >= bearing_range_depth) {
     // Add depth factor for ROV
     auto depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.rov_depth_sigma);
-    graph_.add(boost::make_shared<DepthFactor>(rKey, usbl_msg->position.z, depth_noise));
+    graph_.add(std::make_shared<DepthFactor>(rKey, usbl_msg->position.z, depth_noise));
   }
 
   // Initialize step counter and last timestamp for this ROV
@@ -483,7 +484,8 @@ void FactorGraphTrackingNode::initializeGraphWithGNSS(const GNSSNavPvt::SharedPt
   double pos_sigma = std::clamp(static_cast<double>(gnss_msg->h_acc),
                                 fgo_config_.gps_sigma_floor, fgo_config_.gps_sigma_max);
   auto gps_noise = gtsam::noiseModel::Isotropic::Sigma(3, pos_sigma);
-  graph_.add(gtsam::GPSFactor(X(0), gtsam::Point3(ned_coords.n, ned_coords.e, ned_coords.d), gps_noise));
+  auto gps_leverarm = gtsam::Point3(env_config_.gps_offset[0], env_config_.gps_offset[1], env_config_.gps_offset[2]);
+  graph_.add(gtsam::GPSFactorArm(X(0), gtsam::Point3(ned_coords.n, ned_coords.e, ned_coords.d), gps_leverarm, gps_noise));
 
   values_.insert(X(0), priorPose);
   values_.insert(V(0), priorVel);
