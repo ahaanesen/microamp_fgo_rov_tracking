@@ -62,6 +62,13 @@ class PlotterCSVJoint:
         self.rov_est = _xyz(rov_est_df, "x", "y", "z")
         self.asv_est = _xyz(asv_est_df, "x", "y", "z")
 
+        # Align by relative time (offset each to start at zero)
+        # Should fix this when creating the CSVs
+        self.rov_gt_t -= self.rov_gt_t[0]
+        self.asv_gt_t -= self.asv_gt_t[0]
+        self.rov_est_t -= self.rov_est_t[0]
+        self.asv_est_t -= self.asv_est_t[0]
+
     def plot3d(self):
         self._load()
 
@@ -140,15 +147,15 @@ class PlotterCSVJoint:
         if self.save_dir:
             path = Path(self.save_dir)
             path.mkdir(parents=True, exist_ok=True)
-            fig.savefig(path / "3d_joint_new.png", dpi=150, bbox_inches="tight")
+            fig.savefig(path / "3d_joint_new2.png", dpi=150, bbox_inches="tight")
 
         plt.show(block=True)
 
 plotter = PlotterCSVJoint(
     rov_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/rov_ground_truth.csv",
     asv_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/asv_ground_truth.csv",
-    rov_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/scenario3/rov_estimated_20260416_090058.csv",
-    asv_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/scenario3/boat_estimated_20260416_090058.csv",
+    rov_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/scenario3/rov_estimated_20260418_175712.csv",
+    asv_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/scenario3/boat_estimated_20260418_175712.csv",
     scenario_name="Scenario 3",
     save_dir="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/plots/scenario3",
 )

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import math
+
 import rclpy
 from rclpy.node import Node
 import csv
@@ -19,6 +21,12 @@ csv_path = Path("microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processin
 # This node subscribes to the ASV and ROV state topics and logs the data to CSV files for later analysis and plotting.
 # Run directly in python as is not packaged
 class CSVLogger(Node):
+    @staticmethod
+    def _first_attr(msg, names, default=math.nan):
+        for n in names:
+            if hasattr(msg, n):
+                return getattr(msg, n)
+        return default
 
     def __init__(self):
         super().__init__('csv_logger')
@@ -36,7 +44,9 @@ class CSVLogger(Node):
         self.boat_file = open(csv_path / f'boat_estimated_{timestamp}.csv', 'w', newline='')
         self.boat_writer = csv.writer(self.boat_file)
         self.boat_writer.writerow([
-            'time', 'x', 'y', 'z', 'yaw', 'surge', 'sway', 'yaw_rate'
+            'time', 'x', 'y', 'z', 'yaw', 'surge', 'sway', 'yaw_rate',
+            'gyro_bias_x', 'gyro_bias_y', 'gyro_bias_z',
+            'accel_bias_x', 'accel_bias_y', 'accel_bias_z',
         ])
 
         # Subscribers
@@ -73,6 +83,14 @@ class CSVLogger(Node):
     def boat_callback(self, msg):
         t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
 
+        gyro_bias_x = self._first_attr(msg, ['gyro_bias_x', 'bias_gyro_x', 'bgx'])
+        gyro_bias_y = self._first_attr(msg, ['gyro_bias_y', 'bias_gyro_y', 'bgy'])
+        gyro_bias_z = self._first_attr(msg, ['gyro_bias_z', 'bias_gyro_z', 'bgz'])
+
+        accel_bias_x = self._first_attr(msg, ['accel_bias_x', 'bias_acc_x', 'bax'])
+        accel_bias_y = self._first_attr(msg, ['accel_bias_y', 'bias_acc_y', 'bay'])
+        accel_bias_z = self._first_attr(msg, ['accel_bias_z', 'bias_acc_z', 'baz'])
+
         self.boat_writer.writerow([
             t,
             msg.x,
@@ -81,7 +99,13 @@ class CSVLogger(Node):
             msg.yaw,
             msg.surge,
             msg.sway,
-            msg.yaw_r
+            msg.yaw_r,
+            gyro_bias_x,
+            gyro_bias_y,
+            gyro_bias_z,
+            accel_bias_x,
+            accel_bias_y,
+            accel_bias_z,
         ])
 
     def destroy_node(self):
