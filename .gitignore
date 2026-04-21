@@ -1,0 +1,8 @@
+# ROS
+/build
+/install
+/log*
+
+#Simulation and post-processing data
+/post_processing/debugging/plots/*
+/post_processing/plots/*
