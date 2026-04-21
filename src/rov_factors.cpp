@@ -33,12 +33,16 @@ Vector UsblFactor::evaluateError(
     typename Base::template OptionalMatrixTypeT<gtsam::Pose3> H_asv,
     typename Base::template OptionalMatrixTypeT<gtsam::Point3> H_rov) const {
     // USBL azimuth/elevation are reported in world NED, not in the sensor/body frame.
-    // Model the measurement directly from the world-frame ASV->ROV vector.
-    (void)body_P_sensor_;
+    // Model the measurement directly from the world-frame USBL-sensor->ROV vector.
+    // The USBL lever arm matters here because the sensor position changes with ASV attitude.
     double measAzimuthRad = measuredAzimuth_ * M_PI / 180.0;
     double measElevationRad = measuredElevation_ * M_PI / 180.0;
 
-    gtsam::Vector3 p_world = rovPoint - asvPose.translation();
+    gtsam::Matrix36 H_sensor_pos_asv;
+    const gtsam::Point3 sensor_world =
+        asvPose.transformFrom(body_P_sensor_.translation(), H_asv ? &H_sensor_pos_asv : nullptr);
+
+    gtsam::Vector3 p_world = rovPoint - sensor_world;
 
     double x = p_world.x();
     double y = p_world.y();
@@ -64,9 +68,7 @@ Vector UsblFactor::evaluateError(
     }
 
     if (H_asv) {
-        gtsam::Matrix26 H_err_pose = gtsam::Matrix26::Zero();
-        H_err_pose.block<2, 3>(0, 3) = -H_angles_world;
-        *H_asv = H_err_pose;
+        *H_asv = -H_angles_world * H_sensor_pos_asv;
     }
 
     if (H_rov) {

@@ -50,7 +50,7 @@ void declareAndLoadEnv(rclcpp::Node& node, EnvConfig& cfg) {
 void declareAndLoadFgo(rclcpp::Node& node, FgoConfig& cfg) {
 #define LOAD_D(name) do { node.declare_parameter("fgo." #name, cfg.name); cfg.name = node.get_parameter("fgo." #name).as_double(); } while (0)
   LOAD_D(accel_noise); LOAD_D(gyro_noise); LOAD_D(accel_rw); LOAD_D(gyro_rw);
-  LOAD_D(prior_pose_sigma); LOAD_D(prior_vel_sigma); LOAD_D(prior_bias_sigma); LOAD_D(prior_accel_bias_sigma);
+  LOAD_D(prior_translation_sigma); LOAD_D(prior_rotation_sigma); LOAD_D(prior_vel_sigma); LOAD_D(prior_bias_sigma); LOAD_D(prior_accel_bias_sigma);
   LOAD_D(gps_sigma_ne); LOAD_D(gps_sigma_d); LOAD_D(gps_sigma_floor); LOAD_D(gps_sigma_max);
   LOAD_D(rov_cv_continous_sigma);
   LOAD_D(rov_prior_pos_sigma); LOAD_D(rov_prior_vel_sigma); LOAD_D(rov_process_vel_sigma);

@@ -9,7 +9,9 @@ microamp_factor_graph_tracking:
       gyro_rw: 0.00005         # rad/s random walk std (gyro_bias_std=5e-5)
       
       # Prior uncertainties (initial graph setup) — from ESKF initial state
-      prior_pose_sigma: 1.0    # metres and radians (init ASV pos uncert)
+      # prior_pose_sigma: 0.087    # metres and radians (init ASV pos uncert)
+      prior_translation_sigma: 0.1 # metres (init ASV pos uncert)
+      prior_rotation_sigma: 5    # radians (init ASV orientation uncert)
       prior_vel_sigma: 0.1     # m/s (init ASV vel uncert)
       prior_bias_sigma: 0.001  # IMU gyro bias prior
       prior_accel_bias_sigma: 0.01  # IMU accel bias prior
@@ -22,7 +24,7 @@ microamp_factor_graph_tracking:
       
       # ==================== ROV PARAMETERS ====================
       # ROV state priors (initial uncertainty when ROV first detected) — from ESKF initial state
-      rov_cv_continous_sigma: 0.2  # m/s (ModelCV sigma_a process noise)
+      rov_cv_continous_sigma: 0.02  # m/s (ModelCV sigma_a process noise)
       rov_prior_pos_sigma: 2.0     # metres (init ROV pos uncert)
       rov_prior_vel_sigma: 0.1     # m/s (init ROV vel uncert)
       

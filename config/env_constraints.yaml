@@ -3,9 +3,9 @@ microamp_factor_graph_tracking:
     env:
       imu_rate_hz: 100.0
       gnss_rate_hz: 1.0
-      usbl_rate_hz: 0.2
+      usbl_rate_hz: 1.0
 
-      gravity: 9.82145996
+      gravity: 9.82
       sound_speed: 1500.0
 
       gps_offset: [

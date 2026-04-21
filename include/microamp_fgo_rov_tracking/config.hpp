@@ -15,9 +15,9 @@ struct TopicsConfig {
 struct EnvConfig {
     double imu_rate_hz{100.0}; 
     double gnss_rate_hz{1.0}; 
-    double usbl_rate_hz{0.2}; 
+    double usbl_rate_hz{1.0}; 
 
-    double gravity{9.82145996};
+    double gravity{9.82};
     double sound_speed{1500.0};
     std::vector<double> gps_offset{0.3, 0.3, 0.1}; // x, y, z offsets for GPS antenna from ASV center (in meters)
     double usbl_offset_x{0.0};
@@ -38,7 +38,9 @@ struct FgoConfig {
   double gyro_rw{0.00005};       // rad/s random walk std (gyro_bias_std)
 
   // ASV prior uncertainties (from ESKF initial state)
-  double prior_pose_sigma{1.0};           // metres and radians
+  // double prior_pose_sigma{1.0};           // metres and radians
+  double prior_translation_sigma{1};     // metres (init ASV pos uncert)
+  double prior_rotation_sigma{0.087};     // radians (init ASV orientation uncert)
   double prior_vel_sigma{0.1};            // m/s
   double prior_bias_sigma{0.001};         // IMU gyro bias prior
   double prior_accel_bias_sigma{0.01};    // IMU accel bias prior
@@ -50,7 +52,7 @@ struct FgoConfig {
   double gps_sigma_max{50.0};     // maximum GPS sigma (metres)
 
   // ROV priors (from ESKF initial state)
-  double rov_cv_continous_sigma{0.2};    // m/s (ModelCV process noise)
+  double rov_cv_continous_sigma{0.02};    // m/s (ModelCV process noise)
   double rov_prior_pos_sigma{2.0};       // metres
   double rov_prior_vel_sigma{0.1};       // m/s
   double rov_process_vel_sigma{0.2};     // m/s (matches ModelCV sigma_a)

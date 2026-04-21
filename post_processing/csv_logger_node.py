@@ -16,7 +16,7 @@ boat_state_topic = "/state/boat"
 rov_state_topic = "/state/rov"
 
 # Path to save CSV files (optional, can be current directory)
-csv_path = Path("microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/scenario3")
+csv_path = Path("microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/0_02cv_sigma")
 
 # This node subscribes to the ASV and ROV state topics and logs the data to CSV files for later analysis and plotting.
 # Run directly in python as is not packaged

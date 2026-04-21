@@ -43,8 +43,7 @@ FactorGraphTrackingNode::FactorGraphTrackingNode()
   // ------------------------------------------------------------------
   // IMU Preintegration (NED)
   // ------------------------------------------------------------------
-  pim_params_ =
-    gtsam::PreintegratedCombinedMeasurements::Params::MakeSharedD(env_config_.gravity);
+  pim_params_ = gtsam::PreintegratedCombinedMeasurements::Params::MakeSharedD(env_config_.gravity);
 
 
   // IMU preintegration covariances (from ESKF model) 
@@ -124,7 +123,7 @@ void FactorGraphTrackingNode::imuCallback(const Imu::SharedPtr msg) {
     return;
   }
 
-  double dt = 1 / env_config_.imu_rate_hz;
+  double dt = (stamp - last_imu_time_).seconds();
   last_imu_time_ = stamp;
 
   // if (dt <= 0.0) {
@@ -362,9 +361,8 @@ void FactorGraphTrackingNode::rovUpdateWithUsbl(uint8_t rov_id,
     graph_.add(std::make_shared<DepthFactor>(r_curr, usbl_msg->position.z, depth_noise));
   }
 
-  RCLCPP_INFO(get_logger(), "Added new ROV node for ROV ID %d at time %.2f with associated ASV node at time %.2f based on USBL measurement sent at %.2f (received at %.2f)", 
-              rov_id, rov_time, rclcpp::Time(isam2_.calculateEstimate<gtsam::Pose3>(associated_asv_key).translation().x()).seconds(), 
-              static_cast<double>(usbl_msg->t_sent) / 1e6, static_cast<double>(usbl_msg->t_received) / 1e6);
+  RCLCPP_INFO(get_logger(), "Added new ROV node for ROV ID %d at time %.2f based on USBL measurement sent at %.2f (received at %.2f)", 
+              rov_id, rov_time, static_cast<double>(usbl_msg->t_sent) / 1e6, static_cast<double>(usbl_msg->t_received) / 1e6);
 }
 
 // ============================================================
@@ -482,9 +480,8 @@ void FactorGraphTrackingNode::initializeGraphWithGNSS(const GNSSNavPvt::SharedPt
   gtsam::imuBias::ConstantBias priorBias;
 
   auto pose_noise = gtsam::noiseModel::Diagonal::Sigmas(
-      (gtsam::Vector(6) << fgo_config_.prior_pose_sigma, fgo_config_.prior_pose_sigma,
-       fgo_config_.prior_pose_sigma, fgo_config_.prior_pose_sigma, fgo_config_.prior_pose_sigma,
-       fgo_config_.prior_pose_sigma).finished());
+      (gtsam::Vector(6) << M_PI, M_PI, M_PI, 
+       fgo_config_.prior_translation_sigma, fgo_config_.prior_translation_sigma, fgo_config_.prior_translation_sigma).finished());
 
   // Priors on pose, velocity, bias
   graph_.add(gtsam::PriorFactor<gtsam::Pose3>(X(0), priorPose, pose_noise));
@@ -544,7 +541,8 @@ void FactorGraphTrackingNode::publishBoatState(const gtsam::Values &est) {
                           pose.rotation().matrix()(0, 0));
 
   BoatState s;
-  s.header.stamp = now();
+  // s.header.stamp = now();
+  s.header.stamp = rclcpp::Time(last_asv_timestamp_); // For comparison with GT
   s.x = pose.translation().x();
   s.y = pose.translation().y();
   s.z = pose.translation().z();
@@ -552,13 +550,19 @@ void FactorGraphTrackingNode::publishBoatState(const gtsam::Values &est) {
   s.surge = vel.x();
   s.sway = vel.y();
   s.yaw_r = last_gyro_z_ - bias.gyroscope()(2);
+  s.gyro_bias_x = bias.gyroscope()(0);
+  s.gyro_bias_y = bias.gyroscope()(1);
+  s.gyro_bias_z = bias.gyroscope()(2);
+  s.accel_bias_x = bias.accelerometer()(0);
+  s.accel_bias_y = bias.accelerometer()(1);
+  s.accel_bias_z = bias.accelerometer()(2);
 
   state_pub_->publish(s);
 }
 
 void FactorGraphTrackingNode::publishROVState(const gtsam::Values &est) {
   for (const auto& [rov_id, initialized] : rov_initialised_) {
-    if (initialized) {
+    if (initialized && rov_step_counters_[rov_id] >= 1) { // Ensure we have at least one measurement for this ROV to publish a state
       uint32_t current_rov_step = rov_step_counters_[rov_id] - 1; // Last updated step
       gtsam::Key rKey = getRovKey('R', rov_id, current_rov_step);
       gtsam::Key wKey = getRovKey('W', rov_id, current_rov_step);
@@ -571,7 +575,8 @@ void FactorGraphTrackingNode::publishROVState(const gtsam::Values &est) {
       auto rov_vel = est.at<gtsam::Vector3>(wKey);
 
       ROVState rs;
-      rs.header.stamp = now();
+      // rs.header.stamp = now();
+      rs.header.stamp = rclcpp::Time(last_rov_timestamp_[rov_id]); // For comparison with GT
 
       rs.rov_id = rov_id;
 
