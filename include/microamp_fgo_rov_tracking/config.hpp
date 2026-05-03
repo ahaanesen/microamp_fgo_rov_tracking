@@ -13,13 +13,13 @@ struct TopicsConfig {
 };
 
 struct EnvConfig {
-    double imu_rate_hz{100.0}; 
-    double gnss_rate_hz{1.0}; 
-    double usbl_rate_hz{1.0}; 
+    double imu_rate_hz{100.0};
+    double gnss_rate_hz{1.0};
+    double usbl_rate_hz{1.0};
 
     double gravity{9.82};
     double sound_speed{1500.0};
-    std::vector<double> gps_offset{0.3, 0.3, 0.1}; // x, y, z offsets for GPS antenna from ASV center (in meters)
+    std::vector<double> gps_offset{0.3, 0.3, 0.1};
     double usbl_offset_x{0.0};
     double usbl_offset_y{0.0};
     double usbl_offset_z{1.2};
@@ -31,42 +31,47 @@ struct EnvConfig {
 };
 
 struct FgoConfig {
-  // ASV IMU noise (from ESKF ModelIMU)
-  double accel_noise{0.001167};  // m/s² white noise std
-  double gyro_noise{0.0000436};  // rad/s white noise std
-  double accel_rw{0.004};        // m/s² random walk std (accm_bias_std)
-  double gyro_rw{0.00005};       // rad/s random walk std (gyro_bias_std)
+  // ASV IMU noise
+  double accel_noise{0.001167};
+  double gyro_noise{0.0000436};
+  double accel_rw{0.004};
+  double gyro_rw{0.00005};
 
-  // ASV prior uncertainties (from ESKF initial state)
-  // double prior_pose_sigma{1.0};           // metres and radians
-  double prior_translation_sigma{1};     // metres (init ASV pos uncert)
-  double prior_rotation_sigma{0.087};     // radians (init ASV orientation uncert)
-  double prior_vel_sigma{0.1};            // m/s
-  double prior_bias_sigma{0.001};         // IMU gyro bias prior
-  double prior_accel_bias_sigma{0.01};    // IMU accel bias prior
+  // ASV prior uncertainties
+  double prior_translation_sigma{1.0};
+  double prior_rotation_sigma{0.087};
+  double prior_vel_sigma{0.1};
+  double prior_bias_sigma{0.001};
+  double prior_accel_bias_sigma{0.01};
 
-  // GPS measurement noise (from ESKF SensorGNSS_ASV)
-  double gps_sigma_ne{0.3};       // horizontal GPS sigma (metres)
-  double gps_sigma_d{0.5};        // depth GPS sigma (metres)
-  double gps_sigma_floor{0.3};    // minimum GPS sigma (metres)
-  double gps_sigma_max{50.0};     // maximum GPS sigma (metres)
+  // GPS measurement noise
+  double gps_sigma_ne{0.3};
+  double gps_sigma_d{0.5};
+  double gps_sigma_floor{0.3};
+  double gps_sigma_max{50.0};
 
-  // ROV priors (from ESKF initial state)
-  double rov_cv_continous_sigma{0.02};    // m/s (ModelCV process noise)
-  double rov_prior_pos_sigma{2.0};       // metres
-  double rov_prior_vel_sigma{0.1};       // m/s
-  double rov_process_vel_sigma{0.02};     // m/s (matches ModelCV sigma_a)
+  // ROV CV process noise.
+  // MUST match ESKF ModelCV sigma_a.  Previously 0.02 (10x too small).
+  // Q matrix uses DWPA formulation: Q_pp = sigma^2 * dt^4/4,
+  //                                 Q_pv = sigma^2 * dt^3/2,
+  //                                 Q_vv = sigma^2 * dt^2.
+  double rov_cv_continous_sigma{0.20};   // m/s²
+  double rov_process_vel_sigma{0.20};    // kept for compatibility
 
-  // USBL/Range sensor noise (from ESKF sensors)
-  double usbl_azimuth_sigma{0.01745};    // radians (~1 degree)
-  double usbl_elevation_sigma{0.01745};  // radians (~1 degree)
-  double acoustic_range_sigma{0.5};      // metres (SensorRange_Joint)
-  double rov_depth_sigma{0.3};           // metres (SensorDepth_ROV)
+  // ROV priors
+  double rov_prior_pos_sigma{2.0};
+  double rov_prior_vel_sigma{0.5};       // widened from 0.1 — ROV may be moving at init
 
-    // Bearing-only: weak depth stabilizing prior (NOT a measurement)
-  bool use_rov_depth_prior{true};        // enable/disable
-  double rov_depth_prior_mean{10.0};      // nominal Down [m] (choose a reasonable mission value)
-  double rov_depth_prior_sigma{10.0};     // very weak prior [m] (e.g., 5–20m)
+  // USBL / range / depth sensor noise
+  double usbl_azimuth_sigma{0.01745};
+  double usbl_elevation_sigma{0.01745};
+  double acoustic_range_sigma{0.5};
+  double rov_depth_sigma{0.3};
+
+  // Bearing-only: weak depth stabilising prior
+  bool   use_rov_depth_prior{true};
+  double rov_depth_prior_mean{10.0};
+  double rov_depth_prior_sigma{10.0};
 };
 
 
