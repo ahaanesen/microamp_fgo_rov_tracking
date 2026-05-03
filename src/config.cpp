@@ -56,5 +56,13 @@ void declareAndLoadFgo(rclcpp::Node& node, FgoConfig& cfg) {
   LOAD_D(rov_prior_pos_sigma); LOAD_D(rov_prior_vel_sigma); LOAD_D(rov_process_vel_sigma);
   LOAD_D(usbl_azimuth_sigma); LOAD_D(usbl_elevation_sigma);
   LOAD_D(acoustic_range_sigma); LOAD_D(rov_depth_sigma);
+  // new (bool)
+  node.declare_parameter("fgo.use_rov_depth_prior", cfg.use_rov_depth_prior);
+  cfg.use_rov_depth_prior = node.get_parameter("fgo.use_rov_depth_prior").as_bool();
+
+  // new (double)
+  LOAD_D(rov_depth_prior_mean);
+  LOAD_D(rov_depth_prior_sigma);
+
 #undef LOAD_D
 }

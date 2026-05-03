@@ -32,6 +32,8 @@ FactorGraphTrackingNode::FactorGraphTrackingNode()
       graph_initialised_(false), asv_index_(0), datum_initialised_(false) {
   
   loadConfigurations();
+  scenario_id_ = resolveScenarioId();
+  RCLCPP_INFO(get_logger(), "Using scenario_id=%u", static_cast<unsigned>(scenario_id_));
 
   // Initialize NED converter with default datum (can be overridden by first GNSS)
   auto default_datum_lat = 60.3913;
@@ -97,6 +99,22 @@ void FactorGraphTrackingNode::loadConfigurations() {
   declareAndLoadTopics(*this, topics_config_);
   declareAndLoadEnv(*this, env_config_);
   declareAndLoadFgo(*this, fgo_config_);
+}
+
+uint8_t FactorGraphTrackingNode::resolveScenarioId() {
+  this->declare_parameter<int>("scenario_id", bearing_range_depth);
+  const int configured_scenario = this->get_parameter("scenario_id").as_int();
+
+  if (configured_scenario < bearing_only || configured_scenario > bearing_range_depth) {
+    RCLCPP_WARN(
+        get_logger(),
+        "Invalid scenario_id=%d. Falling back to scenario %d.",
+        configured_scenario,
+        bearing_range_depth);
+    return bearing_range_depth;
+  }
+
+  return static_cast<uint8_t>(configured_scenario);
 }
 
 FactorGraphTrackingNode::~FactorGraphTrackingNode() = default;
@@ -332,14 +350,36 @@ void FactorGraphTrackingNode::rovUpdateWithUsbl(uint8_t rov_id,
   values_.insert(w_curr, w_pred.eval()); // Assume CV
 
   // Add motion model factor between previous and new ROV node (CV model)
-  const double q = fgo_config_.rov_cv_continous_sigma * fgo_config_.rov_cv_continous_sigma;
+  // const double q = fgo_config_.rov_cv_continous_sigma * fgo_config_.rov_cv_continous_sigma;
+  // gtsam::Matrix66 cov = gtsam::Matrix66::Zero();
+  // // Piecewise Constant Acceleration (PCA) model
+  // // cov.block<3,3>(0,0) = gtsam::Matrix33::Identity() * (q * std::pow(dt_rov, 4) / 4.0);
+  // // cov.block<3,3>(0,3) = gtsam::Matrix33::Identity() * (q * std::pow(dt_rov, 3) / 2.0);
+  // // cov.block<3,3>(3,0) = gtsam::Matrix33::Identity() * (q * std::pow(dt_rov, 3) / 2.0);
+  // // cov.block<3,3>(3,3) = gtsam::Matrix33::Identity() * (q * std::pow(dt_rov, 2));
+  
+  // // Standard CV model
+  // cov.block<3,3>(0,0) = gtsam::Matrix33::Identity() * (q * std::pow(dt_rov, 3) / 3.0);
+  // cov.block<3,3>(0,3) = gtsam::Matrix33::Identity() * (q * std::pow(dt_rov, 2) / 2.0);
+  // cov.block<3,3>(3,0) = gtsam::Matrix33::Identity() * (q * std::pow(dt_rov, 2) / 2.0);
+  // cov.block<3,3>(3,3) = gtsam::Matrix33::Identity() * (q * dt_rov);
+
+  const double q_h = fgo_config_.rov_cv_continous_sigma * fgo_config_.rov_cv_continous_sigma;
+  const double q_v = (q_h * 0.1); // 10x tighter in Down
   gtsam::Matrix66 cov = gtsam::Matrix66::Zero();
-  cov.block<3,3>(0,0) = gtsam::Matrix33::Identity() * (q * std::pow(dt_rov, 3) / 3.0);
-  cov.block<3,3>(0,3) = gtsam::Matrix33::Identity() * (q * std::pow(dt_rov, 2) / 2.0);
-  cov.block<3,3>(3,0) = gtsam::Matrix33::Identity() * (q * std::pow(dt_rov, 2) / 2.0);
-  cov.block<3,3>(3,3) = gtsam::Matrix33::Identity() * (q * dt_rov);
+  // Position block
+  cov(0,0) = q_h * std::pow(dt_rov,3)/3; cov(1,1) = q_h * std::pow(dt_rov,3)/3; cov(2,2) = q_v * std::pow(dt_rov,3)/3;
+  // Cross terms
+  cov(0,3) = q_h * std::pow(dt_rov,2)/2; cov(3,0) = q_h * std::pow(dt_rov,2)/2;
+  cov(1,4) = q_h * std::pow(dt_rov,2)/2; cov(4,1) = q_h * std::pow(dt_rov,2)/2;
+  cov(2,5) = q_v * std::pow(dt_rov,2)/2; cov(5,2) = q_v * std::pow(dt_rov,2)/2;
+  // Velocity block
+  cov(3,3) = q_h * dt_rov; cov(4,4) = q_h * dt_rov; cov(5,5) = q_v * dt_rov;
+
+
   auto cv_noise = gtsam::noiseModel::Gaussian::Covariance(cov);
   graph_.add(std::make_shared<ConstantVelocityFactor>(r_prev, w_prev, r_curr, w_curr, dt_rov, cv_noise));
+
 
   // Add USBL factor between ASV node and new ROV node
   auto body_P_sensor = getBodyToUsblPose(env_config_);
@@ -347,15 +387,22 @@ void FactorGraphTrackingNode::rovUpdateWithUsbl(uint8_t rov_id,
     (gtsam::Vector(2) << fgo_config_.usbl_azimuth_sigma, fgo_config_.usbl_elevation_sigma).finished());
   graph_.add(std::make_shared<UsblFactor>(
     associated_asv_key, r_curr, usbl_msg->azimuth, usbl_msg->elevation, body_P_sensor, usbl_noise));
+
+    // In rovUpdateWithUsbl, after the USBL factor:
+  if (fgo_config_.use_rov_depth_prior) {
+      auto depth_prior_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.rov_depth_prior_sigma);
+      graph_.add(std::make_shared<DepthFactor>(
+          r_curr, fgo_config_.rov_depth_prior_mean, depth_prior_noise));
+  }
   
-  if (SCENARIO_ID >= bearing_range) {
+  if (scenario_id_ >= bearing_range) {
     // Add acoustic range factor between ASV and ROV
     auto tof = (usbl_msg->t_received - usbl_msg->t_sent) / 1e6; // Convert microseconds to seconds
     auto acoustic_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.acoustic_range_sigma / env_config_.sound_speed); // Convert range sigma to time-of-flight sigma
     graph_.add(std::make_shared<PsudoRangeFactor>(
       associated_asv_key, r_curr, tof, env_config_.sound_speed, body_P_sensor, acoustic_noise));
   }
-  if (SCENARIO_ID >= bearing_range_depth) {
+  if (scenario_id_ >= bearing_range_depth) {
     // Add depth factor for ROV
     auto depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.rov_depth_sigma);
     graph_.add(std::make_shared<DepthFactor>(r_curr, usbl_msg->position.z, depth_noise));
@@ -439,14 +486,14 @@ void FactorGraphTrackingNode::initializeNewRov(gtsam::Key associated_asv_key, co
   graph_.add(std::make_shared<UsblFactor>(
     associated_asv_key, rKey, usbl_msg->azimuth, usbl_msg->elevation, body_P_sensor, usbl_noise));
   
-  if (SCENARIO_ID >= bearing_range) {
+  if (scenario_id_ >= bearing_range) {
     // Add acoustic range factor between ASV and ROV
     auto tof = (usbl_msg->t_received - usbl_msg->t_sent) / 1e6; // Convert microseconds to seconds
     auto acoustic_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.acoustic_range_sigma / env_config_.sound_speed); // Convert range sigma to time-of-flight sigma
     graph_.add(std::make_shared<PsudoRangeFactor>(
       associated_asv_key, rKey, tof, env_config_.sound_speed, body_P_sensor, acoustic_noise));
   }
-  if (SCENARIO_ID >= bearing_range_depth) {
+  if (scenario_id_ >= bearing_range_depth) {
     // Add depth factor for ROV
     auto depth_noise = gtsam::noiseModel::Isotropic::Sigma(1, fgo_config_.rov_depth_sigma);
     graph_.add(std::make_shared<DepthFactor>(rKey, usbl_msg->position.z, depth_noise));

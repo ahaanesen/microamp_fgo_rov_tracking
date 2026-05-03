@@ -16,7 +16,7 @@ imu_topic = "/microampere/imu/data"
 usbl_topic = "/microampere/sensors/usbl"
 
 # Path to save CSV files (optional, can be current directory)
-csv_path = Path("microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data")
+csv_path = Path("microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/8")
 
 # This node subscribes to the ASV and ROV state topics and logs the data to CSV files for later analysis and plotting.
 # Run directly in python as is not packaged

@@ -35,7 +35,6 @@ enum scenarios {
   bearing_range = 2,
   bearing_range_depth = 3
 };
-constexpr uint8_t SCENARIO_ID = bearing_range_depth; 
 
 using gtsam::symbol_shorthand::B; // Bias  (b)
 using gtsam::symbol_shorthand::V; // Velocity (v)
@@ -61,6 +60,7 @@ public:
 private:
   // ==================== INITIALIZATION & CONFIG ====================
   void loadConfigurations();
+  uint8_t resolveScenarioId();
   void initializeDatumFromGNSS(const GNSSNavPvt &msg);
   void initializeGraphWithGNSS(const GNSSNavPvt::SharedPtr msg);
 
@@ -117,6 +117,7 @@ private:
   EnvConfig env_config_;
   FgoConfig fgo_config_;
   TopicsConfig topics_config_;
+  uint8_t scenario_id_ = bearing_range_depth;
 
   // ==================== ROS SUBSCRIPTIONS ====================
   rclcpp::Subscription<Imu>::SharedPtr imu_sub_;

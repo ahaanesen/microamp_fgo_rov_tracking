@@ -55,14 +55,20 @@ struct FgoConfig {
   double rov_cv_continous_sigma{0.02};    // m/s (ModelCV process noise)
   double rov_prior_pos_sigma{2.0};       // metres
   double rov_prior_vel_sigma{0.1};       // m/s
-  double rov_process_vel_sigma{0.2};     // m/s (matches ModelCV sigma_a)
+  double rov_process_vel_sigma{0.02};     // m/s (matches ModelCV sigma_a)
 
   // USBL/Range sensor noise (from ESKF sensors)
   double usbl_azimuth_sigma{0.01745};    // radians (~1 degree)
   double usbl_elevation_sigma{0.01745};  // radians (~1 degree)
   double acoustic_range_sigma{0.5};      // metres (SensorRange_Joint)
   double rov_depth_sigma{0.3};           // metres (SensorDepth_ROV)
+
+    // Bearing-only: weak depth stabilizing prior (NOT a measurement)
+  bool use_rov_depth_prior{true};        // enable/disable
+  double rov_depth_prior_mean{10.0};      // nominal Down [m] (choose a reasonable mission value)
+  double rov_depth_prior_sigma{10.0};     // very weak prior [m] (e.g., 5–20m)
 };
+
 
 void declareAndLoadTopics(rclcpp::Node& node, TopicsConfig& cfg);
 void declareAndLoadEnv(rclcpp::Node& node, EnvConfig& cfg);

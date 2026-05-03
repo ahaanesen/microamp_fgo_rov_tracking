@@ -30,8 +30,8 @@ microamp_factor_graph_tracking:
       
       # Constant velocity model process noise — from ESKF ModelCV
       # This controls how much we allow velocity to change between timesteps
-      # Matches sigma_a=0.20 from ESKF simulation
-      rov_process_vel_sigma: 0.2   # m/s
+      # Matches sigma_a=0.02 from ESKF simulation
+      rov_process_vel_sigma: 0.02   # m/s
       
       # ==================== USBL SENSOR PARAMETERS ====================
       # USBL bearing measurement noise — from ESKF SensorUSBL_Joint (np.deg2rad(1))
@@ -43,4 +43,11 @@ microamp_factor_graph_tracking:
       
       # ROV depth sensor noise — from ESKF SensorDepth_ROV
       rov_depth_sigma: 0.3          # metres (depth_std=0.3)
+
+      # ==================== BEARING-ONLY TRACKING PARAMETERS ====================
+      # If using bearing-only measurements, we can add a weak depth prior to help stabilize the solution in the vertical axis. This is NOT a measurement, just a soft constraint.
+      use_rov_depth_prior: true       # enable/disable the depth prior
+      rov_depth_prior_mean: 10.0        # nominal depth in metres (choose a reasonable value for the mission)
+      rov_depth_prior_sigma: 10.0      # very weak prior in metres (e.g., 5–20m) to allow flexibility while providing some stabilization
+      
       

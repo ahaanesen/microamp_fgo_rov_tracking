@@ -11,6 +11,7 @@ mpl.rcParams["legend.loc"] = "lower right"
 mpl.rcParams["legend.fontsize"] = "small"
 
 
+
 def _load_csv(path):
     return pd.read_csv(path)
 
@@ -273,7 +274,7 @@ class PlotterCSVJoint:
         ax.zaxis.pane.set_alpha(0.1)
 
         ax.grid(True)
-        ax.set_title(f"FGO: {self.scenario_name} - 3D Trajectories")
+        ax.set_title(f"{self.scenario_name} - 3D Trajectories")
         ax.legend(loc="upper right")
 
         fig.tight_layout()
@@ -310,7 +311,7 @@ class PlotterCSVJoint:
         axs[1].grid(True)
         axs[1].legend()
 
-        fig.suptitle(f"FGO Position Error - {self.scenario_name}")
+        fig.suptitle(f"{self.scenario_name} - Position Errors")
         fig.tight_layout()
         return fig
 
@@ -345,7 +346,7 @@ class PlotterCSVJoint:
             axs[i].grid(True)
 
         axs[-1].set_xlabel("Time [s]")
-        fig.suptitle(f"{platform} Position Error Components - {self.scenario_name}")
+        fig.suptitle(f"{self.scenario_name} - {platform} Position Error Components")
         fig.tight_layout()
         return fig
 
@@ -364,52 +365,65 @@ class PlotterCSVJoint:
 
         return pd.DataFrame(rows)
 
-    def show(self):
+    def save_all(self):
         fig1 = self.plot3d()
         fig2 = self.plot_position_error()
         fig3 = self.plot_position_error_components("ROV")
         fig4 = self.plot_position_error_components("ASV")
         stat_csv = self.export_statistics()
 
-        if self.save_dir:
-            path = Path(self.save_dir)
-            path.mkdir(parents=True, exist_ok=True)
+        if not self.save_dir:
+            raise ValueError("save_dir must be set to save plots and statistics.")
 
-            fig1.savefig(path / "traj_3d.png", dpi=150, bbox_inches="tight")
-            fig2.savefig(path / "position_error.png", dpi=150, bbox_inches="tight")
-            fig3.savefig(path / "rov_position_error_components.png", dpi=150, bbox_inches="tight")
-            fig4.savefig(path / "asv_position_error_components.png", dpi=150, bbox_inches="tight")
-            stat_csv.to_csv(path / "statistics.csv", index=False)
+        path = Path(self.save_dir)
+        path.mkdir(parents=True, exist_ok=True)
+
+        fig1.savefig(path / "traj_3d.png", dpi=150, bbox_inches="tight")
+        fig2.savefig(path / "position_error.png", dpi=150, bbox_inches="tight")
+        fig3.savefig(path / "rov_position_error_components.png", dpi=150, bbox_inches="tight")
+        fig4.savefig(path / "asv_position_error_components.png", dpi=150, bbox_inches="tight")
+        stat_csv.to_csv(path / "fgo_statistics.csv", index=False)
+
+        plt.close(fig1)
+        plt.close(fig2)
+        plt.close(fig3)
+        plt.close(fig4)
+        return path, stat_csv
+
+    def show(self):
+        if self.save_dir:
+            self.save_all()
 
         plt.show(block=True)
 
 
-plotter1 = PlotterCSVJoint(
-    rov_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/circle2/rov_ground_truth.csv",
-    asv_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/circle2/asv_ground_truth.csv",
-    rov_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/0_02cv_sigma/rov_estimated_s1.csv",
-    asv_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/0_02cv_sigma/boat_estimated_s1.csv",
-    scenario_name="Scenario 1: Bearing-only",
-    save_dir="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/plots/scenario1",
-)
-plotter1.show()
+if __name__ == "__main__":
+    plotter1 = PlotterCSVJoint(
+        rov_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/8a/rov_ground_truth.csv",
+        asv_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/8a/asv_ground_truth.csv",
+        rov_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/debugging/test/rov_estimated_my_experiment_01.csv",
+        asv_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/debugging/test/boat_estimated_my_experiment_01.csv",
+        scenario_name="FGO - Scenario 1: Bearing-only",
+        save_dir="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/debugging/test/plots_s1",
+    )
+    plotter1.show()
 
-plotter2 = PlotterCSVJoint(
-    rov_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/circle2/rov_ground_truth.csv",
-    asv_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/circle2/asv_ground_truth.csv",
-    rov_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/0_02cv_sigma/rov_estimated_s2.csv",
-    asv_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/0_02cv_sigma/boat_estimated_s2.csv",
-    scenario_name="Scenario 2: Bearing + range",
-    save_dir="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/plots/scenario2",
-)
-plotter2.show()
+    # plotter2 = PlotterCSVJoint(
+    #     rov_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/circle2/rov_ground_truth.csv",
+    #     asv_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/circle2/asv_ground_truth.csv",
+    #     rov_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/0_02cv_sigma/rov_estimated_s2.csv",
+    #     asv_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/0_02cv_sigma/boat_estimated_s2.csv",
+    #     scenario_name="FGO - Scenario 2: Bearing + range",
+    #     save_dir="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/plots/scenario2",
+    # )
+    # plotter2.show()
 
-plotter3 = PlotterCSVJoint(
-    rov_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/circle2/rov_ground_truth.csv",
-    asv_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/circle2/asv_ground_truth.csv",
-    rov_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/0_02cv_sigma/rov_estimated_s3.csv",
-    asv_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/0_02cv_sigma/boat_estimated_s3.csv",
-    scenario_name="Scenario 3: Bearing + range + depth",
-    save_dir="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/plots/scenario3",
-)
-plotter3.show()
+    # plotter3 = PlotterCSVJoint(
+    #     rov_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/circle2/rov_ground_truth.csv",
+    #     asv_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/circle2/asv_ground_truth.csv",
+    #     rov_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/0_02cv_sigma/rov_estimated_s3.csv",
+    #     asv_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/0_02cv_sigma/boat_estimated_s3.csv",
+    #     scenario_name="FGO - Scenario 3: Bearing + range + depth",
+    #     save_dir="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/plots/scenario3",
+    # )
+    # plotter3.show()

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import math
 
 import rclpy
@@ -11,12 +12,13 @@ from datetime import datetime
 # Import your message types
 from blueboat_interfaces.msg import BoatState, ROVState
 
+""" Usage example: 
+    python3 src/microamp_fgo_rov_tracking/post_processing/csv_logger_node.py --output-dir src/microamp_fgo_rov_tracking/post_processing/debugging/test --run-name my_experiment_01
+"""
+
 # Topics to subscribe to
 boat_state_topic = "/state/boat"
 rov_state_topic = "/state/rov"
-
-# Path to save CSV files (optional, can be current directory)
-csv_path = Path("microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/0_02cv_sigma")
 
 # This node subscribes to the ASV and ROV state topics and logs the data to CSV files for later analysis and plotting.
 # Run directly in python as is not packaged
@@ -28,20 +30,23 @@ class CSVLogger(Node):
                 return getattr(msg, n)
         return default
 
-    def __init__(self):
+    def __init__(self, output_dir: Path, run_name: str | None = None):
         super().__init__('csv_logger')
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        csv_path.mkdir(parents=True, exist_ok=True)
+        timestamp = run_name or datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         # Open CSV files
-        self.rov_file = open(csv_path / f'rov_estimated_{timestamp}.csv', 'w', newline='')
+        self.rov_path = output_dir / f'rov_estimated_{timestamp}.csv'
+        self.asv_path = output_dir / f'boat_estimated_{timestamp}.csv'
+
+        self.rov_file = open(self.rov_path, 'w', newline='')
         self.rov_writer = csv.writer(self.rov_file)
         self.rov_writer.writerow([
             'time', 'rov_id', 'x', 'y', 'z', 'vx', 'vy', 'vz'
         ])
 
-        self.boat_file = open(csv_path / f'boat_estimated_{timestamp}.csv', 'w', newline='')
+        self.boat_file = open(self.asv_path, 'w', newline='')
         self.boat_writer = csv.writer(self.boat_file)
         self.boat_writer.writerow([
             'time', 'x', 'y', 'z', 'yaw', 'surge', 'sway', 'yaw_rate',
@@ -64,7 +69,9 @@ class CSVLogger(Node):
             10
         )
 
-        self.get_logger().info("CSV Logger started.")
+        self.get_logger().info(
+            f"CSV Logger started. ROV CSV: {self.rov_path} | ASV CSV: {self.asv_path}"
+        )
 
     def rov_callback(self, msg):
         t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
@@ -114,9 +121,25 @@ class CSVLogger(Node):
         super().destroy_node()
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Log ASV and ROV state estimates to CSV.")
+    parser.add_argument(
+        "--output-dir",
+        default="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/estimated_data/0_02cv_sigma",
+        help="Directory where the estimate CSV files will be stored.",
+    )
+    parser.add_argument(
+        "--run-name",
+        default=None,
+        help="Optional suffix used in output filenames instead of a timestamp.",
+    )
+    return parser.parse_args()
+
+
 def main(args=None):
+    cli_args = parse_args()
     rclpy.init(args=args)
-    node = CSVLogger()
+    node = CSVLogger(Path(cli_args.output_dir), cli_args.run_name)
 
     try:
         rclpy.spin(node)

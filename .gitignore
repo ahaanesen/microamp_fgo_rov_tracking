@@ -6,3 +6,6 @@
 #Simulation and post-processing data
 /post_processing/debugging/plots/*
 /post_processing/plots/*
+/post_processing/estimated_data/scenario3
+/post_processing/batch_runs
+/post_processing/__pycache__
