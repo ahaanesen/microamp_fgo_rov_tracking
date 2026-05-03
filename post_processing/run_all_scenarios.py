@@ -34,9 +34,9 @@ source /opt/ros/humble/setup.bash
 source install/setup.bash
 
 python3 src/microamp_fgo_rov_tracking/post_processing/run_all_scenarios.py \
-  --dataset-dir src/microamp_fgo_rov_tracking/post_processing/simulation_data/8_var_speed \
+  --dataset-dir src/microamp_fgo_rov_tracking/post_processing/simulation_data/8a \
   --output-root src/microamp_fgo_rov_tracking/post_processing/batch_runs \
-  --run-name 8_cv_0_02_var_speed_asv \
+  --run-name 8a_cv_0_02_nees \
   --startup-delay 2.0 \
   --fgo-params use_rov_depth_prior=false
  """
@@ -268,6 +268,8 @@ def run_single_scenario(
 
     rov_est_csv = csv_dir / f"rov_estimated_{run_name}.csv"
     asv_est_csv = csv_dir / f"boat_estimated_{run_name}.csv"
+    gnss_csv = csv_dir / f"gnss_{run_name}.csv"
+    usbl_csv = csv_dir / f"usbl_{run_name}.csv"
 
     if not rov_est_csv.exists() or not asv_est_csv.exists():
         raise FileNotFoundError(
@@ -282,6 +284,11 @@ def run_single_scenario(
         asv_est_csv=str(asv_est_csv),
         scenario_name=scenario_name,
         save_dir=str(plot_dir),
+        gnss_csv=str(gnss_csv) if gnss_csv.exists() else None,
+        usbl_csv=str(usbl_csv) if usbl_csv.exists() else None,
+        scenario_id=scenario_id,
+        gps_sigma_ne=float(fgo_params.get("gps_sigma_ne", 0.3)) if fgo_params else 0.3,
+        gps_sigma_d=float(fgo_params.get("gps_sigma_d",  0.5))  if fgo_params else 0.5,
     )
     _, stats_df = plotter.save_all()
 
@@ -317,7 +324,9 @@ def main() -> int:
     run_root.mkdir(parents=True, exist_ok=True)
 
     summary_rows = []
-    for scenario_id, scenario_name in SCENARIOS.items():
+    for i, (scenario_id, scenario_name) in enumerate(SCENARIOS.items()):
+        if i > 0:
+            time.sleep(5.0)  # Let DDS deregister dead nodes before starting the next scenario
         print(f"Running scenario {scenario_id}: {scenario_name}", flush=True)
         scenario_summary = run_single_scenario(
             scenario_id=scenario_id,
@@ -335,10 +344,19 @@ def main() -> int:
     summary_df.to_csv(run_root / "run_summary.csv", index=False)
 
     stats_frames = []
+    consistency_frames = []
     for scenario_id in SCENARIOS:
         stat_path = run_root / f"scenario{scenario_id}" / "plots" / "fgo_statistics.csv"
         stats_frames.append(pd.read_csv(stat_path))
+        consistency_path = run_root / f"scenario{scenario_id}" / "plots" / "consistency_statistics.csv"
+        if consistency_path.exists():
+            consistency_frames.append(pd.read_csv(consistency_path))
     pd.concat(stats_frames, ignore_index=True).to_csv(run_root / "all_statistics.csv", index=False)
+    if consistency_frames:
+        pd.concat(consistency_frames, ignore_index=True).to_csv(
+            run_root / "all_consistency_statistics.csv",
+            index=False,
+        )
 
     print(f"Finished. Outputs saved in {run_root}", flush=True)
     return 0

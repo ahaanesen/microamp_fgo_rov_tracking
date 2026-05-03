@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime
 
 from nav_msgs.msg import Odometry
-from blueboat_interfaces.msg import ROVState, GNSSNavPvt
+from blueboat_interfaces.msg import ROVState, GNSSNavPvt, USBL
 
 """ Usage example:
     python3 src/microamp_fgo_rov_tracking/post_processing/csv_logger_node.py --output-dir src/microamp_fgo_rov_tracking/post_processing/debugging/test --run-name my_experiment_01
@@ -19,6 +19,7 @@ from blueboat_interfaces.msg import ROVState, GNSSNavPvt
 boat_state_topic = "/state/boat"
 rov_state_topic = "/state/rov"
 gnss_topic = "microampere/gnss/nav_pvt"
+usbl_topic = "microampere/sensors/usbl"
 
 
 class _NedConverter:
@@ -71,10 +72,15 @@ class CSVLogger(Node):
         self.rov_path  = output_dir / f'rov_estimated_{timestamp}.csv'
         self.asv_path  = output_dir / f'boat_estimated_{timestamp}.csv'
         self.gnss_path = output_dir / f'gnss_{timestamp}.csv'
+        self.usbl_path = output_dir / f'usbl_{timestamp}.csv'
 
         self.rov_file = open(self.rov_path, 'w', newline='')
         self.rov_writer = csv.writer(self.rov_file)
-        self.rov_writer.writerow(['time', 'rov_id', 'x', 'y', 'z', 'vx', 'vy', 'vz'])
+        self.rov_writer.writerow([
+            'time', 'rov_id', 'x', 'y', 'z', 'vx', 'vy', 'vz',
+            'pos_cov_xx', 'pos_cov_xy', 'pos_cov_xz',
+            'pos_cov_yy', 'pos_cov_yz', 'pos_cov_zz',
+        ])
 
         self.boat_file = open(self.asv_path, 'w', newline='')
         self.boat_writer = csv.writer(self.boat_file)
@@ -90,22 +96,35 @@ class CSVLogger(Node):
             'time', 'lat_deg', 'lon_deg', 'h_m', 'ned_n', 'ned_e', 'ned_d', 'h_acc_m', 'v_acc_m',
         ])
 
+        self.usbl_file = open(self.usbl_path, 'w', newline='')
+        self.usbl_writer = csv.writer(self.usbl_file)
+        self.usbl_writer.writerow([
+            'time', 'rov_id', 'message_index', 'position_x', 'position_y', 'position_z',
+            't_sent_us', 't_received_us', 't_sent_sec', 't_received_sec', 'tof_sec',
+            'azimuth_deg', 'elevation_deg',
+        ])
+
         self._ned = _NedConverter()
 
         self.create_subscription(ROVState, rov_state_topic, self.rov_callback, 10)
         self.create_subscription(Odometry, boat_state_topic, self.boat_callback, 10)
         self.create_subscription(GNSSNavPvt, gnss_topic, self.gnss_callback, 10)
+        self.create_subscription(USBL, usbl_topic, self.usbl_callback, 10)
 
         self.get_logger().info(
-            f"CSV Logger started. ASV: {self.asv_path} | ROV: {self.rov_path} | GNSS: {self.gnss_path}"
+            f"CSV Logger started. ASV: {self.asv_path} | ROV: {self.rov_path} | GNSS: {self.gnss_path} | USBL: {self.usbl_path}"
         )
 
     def rov_callback(self, msg):
         t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        c = msg.position_covariance
         self.rov_writer.writerow([
             t, msg.rov_id,
             msg.position.x, msg.position.y, msg.position.z,
             msg.velocity.x, msg.velocity.y, msg.velocity.z,
+            c[0], c[1], c[2],
+            c[4], c[5],
+            c[8],
         ])
 
     def boat_callback(self, msg):
@@ -144,10 +163,31 @@ class CSVLogger(Node):
             msg.h_acc, msg.v_acc,
         ])
 
+    def usbl_callback(self, msg):
+        t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        t_sent_sec = msg.t_sent * 1e-6
+        t_received_sec = msg.t_received * 1e-6
+        self.usbl_writer.writerow([
+            t,
+            msg.rov_id,
+            msg.message_index,
+            msg.position.x,
+            msg.position.y,
+            msg.position.z,
+            msg.t_sent,
+            msg.t_received,
+            t_sent_sec,
+            t_received_sec,
+            t_received_sec - t_sent_sec,
+            msg.azimuth,
+            msg.elevation,
+        ])
+
     def destroy_node(self):
         self.rov_file.close()
         self.boat_file.close()
         self.gnss_file.close()
+        self.usbl_file.close()
         super().destroy_node()
 
 

@@ -644,6 +644,7 @@ void FactorGraphTrackingNode::publishROVState(const gtsam::Values &est) {
 
       auto rov_pos = est.at<gtsam::Point3>(rKey);
       auto rov_vel = est.at<gtsam::Vector3>(wKey);
+      gtsam::Matrix rov_pos_cov = isam2_.marginalCovariance(rKey);
 
       ROVState rs;
       // rs.header.stamp = now();
@@ -659,6 +660,11 @@ void FactorGraphTrackingNode::publishROVState(const gtsam::Values &est) {
       rs.velocity.y = rov_vel.y();
       rs.velocity.z = rov_vel.z();
 
+      for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+          rs.position_covariance[i * 3 + j] = rov_pos_cov(i, j);
+        }
+      }
 
       rov_state_pub_->publish(rs);
     }
