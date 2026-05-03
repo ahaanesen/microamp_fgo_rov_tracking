@@ -74,7 +74,7 @@ FactorGraphTrackingNode::FactorGraphTrackingNode()
       std::bind(&FactorGraphTrackingNode::gnssCallback, this,
                 std::placeholders::_1));
 
-  state_pub_ = this->create_publisher<BoatState>(topics_config_.boat_state_pub, 10);
+  state_pub_ = this->create_publisher<Odometry>(topics_config_.boat_state_pub, 10);
 
   // ------------------------------------------------------------------
   // ROS I/O — ROV
@@ -279,7 +279,7 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
 
   // 8. Publish updated ASV and ROV states
   auto current_estimate = isam2_.calculateEstimate();
-  publishBoatState(current_estimate);
+  publishBoatOdometry(current_estimate);
   publishROVState(current_estimate);
 
   RCLCPP_INFO(get_logger(), "Processed GNSS measurement at time %.2f, position (%.2f, %.2f, %.2f).", 
@@ -575,36 +575,60 @@ gtsam::Values FactorGraphTrackingNode::updateAndGetEstimate() {
 // PUBLISH STATES
 // ============================================================
 
-void FactorGraphTrackingNode::publishBoatState(const gtsam::Values &est) {
+void FactorGraphTrackingNode::publishBoatOdometry(const gtsam::Values &est) {
   if (!est.exists(X(asv_index_)) || !est.exists(V(asv_index_)) || !est.exists(B(asv_index_))) {
     return;
   }
 
   auto pose = est.at<gtsam::Pose3>(X(asv_index_));
-  auto vel = est.at<gtsam::Vector3>(V(asv_index_));
+  auto vel  = est.at<gtsam::Vector3>(V(asv_index_));
   auto bias = est.at<gtsam::imuBias::ConstantBias>(B(asv_index_));
 
-  double yaw = std::atan2(pose.rotation().matrix()(1, 0),
-                          pose.rotation().matrix()(0, 0));
+  // Marginal covariances from ISAM2 Bayes tree
+  gtsam::Matrix pose_cov_gtsam = isam2_.marginalCovariance(X(asv_index_));
+  gtsam::Matrix vel_cov        = isam2_.marginalCovariance(V(asv_index_));
 
-  BoatState s;
-  // s.header.stamp = now();
-  s.header.stamp = rclcpp::Time(last_asv_timestamp_); // For comparison with GT
-  s.x = pose.translation().x();
-  s.y = pose.translation().y();
-  s.z = pose.translation().z();
-  s.yaw = yaw;
-  s.surge = vel.x();
-  s.sway = vel.y();
-  s.yaw_r = last_gyro_z_ - bias.gyroscope()(2);
-  s.gyro_bias_x = bias.gyroscope()(0);
-  s.gyro_bias_y = bias.gyroscope()(1);
-  s.gyro_bias_z = bias.gyroscope()(2);
-  s.accel_bias_x = bias.accelerometer()(0);
-  s.accel_bias_y = bias.accelerometer()(1);
-  s.accel_bias_z = bias.accelerometer()(2);
+  // GTSAM Pose3 tangent ordering: [rx, ry, rz, tx, ty, tz]
+  // ROS Odometry covariance ordering: [x, y, z, rx, ry, rz]
+  // Permutation: indices {3,4,5,0,1,2}
+  const int perm[6] = {3, 4, 5, 0, 1, 2};
 
-  state_pub_->publish(s);
+  gtsam::Quaternion q = pose.rotation().toQuaternion();
+
+  Odometry odom;
+  odom.header.stamp    = rclcpp::Time(last_asv_timestamp_);
+  odom.header.frame_id = "ned";
+  odom.child_frame_id  = "base_link";
+
+  odom.pose.pose.position.x    = pose.translation().x();
+  odom.pose.pose.position.y    = pose.translation().y();
+  odom.pose.pose.position.z    = pose.translation().z();
+  odom.pose.pose.orientation.x = q.x();
+  odom.pose.pose.orientation.y = q.y();
+  odom.pose.pose.orientation.z = q.z();
+  odom.pose.pose.orientation.w = q.w();
+
+  for (int i = 0; i < 6; ++i)
+    for (int j = 0; j < 6; ++j)
+      odom.pose.covariance[i * 6 + j] = pose_cov_gtsam(perm[i], perm[j]);
+
+  odom.twist.twist.linear.x  = vel.x();
+  odom.twist.twist.linear.y  = vel.y();
+  odom.twist.twist.linear.z  = vel.z();
+  odom.twist.twist.angular.z = last_gyro_z_ - bias.gyroscope()(2);
+
+  // Velocity covariance in top-left 3x3 of 6x6 twist covariance
+  for (int i = 0; i < 3; ++i)
+    for (int j = 0; j < 3; ++j)
+      odom.twist.covariance[i * 6 + j] = vel_cov(i, j);
+
+  // Angular velocity diagonal from gyro noise
+  const double gyro_var = fgo_config_.gyro_noise * fgo_config_.gyro_noise;
+  odom.twist.covariance[21] = gyro_var;
+  odom.twist.covariance[28] = gyro_var;
+  odom.twist.covariance[35] = gyro_var;
+
+  state_pub_->publish(odom);
 }
 
 void FactorGraphTrackingNode::publishROVState(const gtsam::Values &est) {

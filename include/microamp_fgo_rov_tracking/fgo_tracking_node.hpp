@@ -20,10 +20,10 @@
 
 // Custom message types (replace with your actual message packages)
 #include "blueboat_interfaces/msg/gnss_nav_pvt.hpp"
-#include "blueboat_interfaces/msg/boat_state.hpp"
 #include "blueboat_interfaces/msg/usbl.hpp"
 #include "blueboat_interfaces/msg/acoustic_comm_receive.hpp"
 #include "blueboat_interfaces/msg/rov_state.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 
 #include "ned_converter.hpp"
 #include "config.hpp"
@@ -49,7 +49,7 @@ class FactorGraphTrackingNode : public rclcpp::Node {
 public:
   using Imu = sensor_msgs::msg::Imu;
   using GNSSNavPvt = blueboat_interfaces::msg::GNSSNavPvt;
-  using BoatState = blueboat_interfaces::msg::BoatState;
+  using Odometry = nav_msgs::msg::Odometry;
   using USBLMessage = blueboat_interfaces::msg::USBL;
   using AcousticCommReceive = blueboat_interfaces::msg::AcousticCommReceive;
   using ROVState = blueboat_interfaces::msg::ROVState;
@@ -67,7 +67,7 @@ private:
   // ==================== ASV STATE ====================
   void imuCallback(const Imu::SharedPtr msg);
   void gnssCallback(const GNSSNavPvt::SharedPtr msg);
-  void publishBoatState(const gtsam::Values &est);
+  void publishBoatOdometry(const gtsam::Values &est);
 
   // ==================== ROV STATE ====================
   void usblCallback(const USBLMessage::SharedPtr msg);
@@ -126,7 +126,7 @@ private:
   rclcpp::Subscription<AcousticCommReceive>::SharedPtr acoustic_comm_sub_;
 
   // ==================== ROS PUBLISHERS ====================
-  rclcpp::Publisher<BoatState>::SharedPtr state_pub_;
+  rclcpp::Publisher<Odometry>::SharedPtr state_pub_;
   rclcpp::Publisher<ROVState>::SharedPtr rov_state_pub_;
 };
 
