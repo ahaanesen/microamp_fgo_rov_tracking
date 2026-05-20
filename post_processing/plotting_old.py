@@ -16,8 +16,8 @@ try:
     _CHI2_3_LO = float(_chi2.ppf(0.025, 3))
     _CHI2_3_HI = float(_chi2.ppf(0.975, 3))
 except ImportError:
-    _CHI2_3_LO = 0.352
-    _CHI2_3_HI = 9.348
+    _CHI2_3_LO = 0.352   # chi2(3, 0.025)
+    _CHI2_3_HI = 9.348   # chi2(3, 0.975)
 
 
 # ============================================================
@@ -37,6 +37,10 @@ def _gt_time(df):
 
 
 def _fix_est_time(est_t, gt_t):
+    """
+    Some estimate files store epoch seconds with a 1e-9 scaling error,
+    so values around 1.7 appear instead of 1.7e9. Detect and fix that.
+    """
     est_t = np.asarray(est_t, dtype=float)
     gt_t = np.asarray(gt_t, dtype=float)
 
@@ -57,6 +61,10 @@ def _xyz(df, x, y, z):
 
 
 def _interp(src_t, src_xyz, tgt_t):
+    """
+    Interpolate 3D positions from src_t onto tgt_t.
+    Samples outside the valid source time range are left as NaN.
+    """
     src_t = np.asarray(src_t, dtype=float)
     tgt_t = np.asarray(tgt_t, dtype=float)
     src_xyz = np.asarray(src_xyz, dtype=float)
@@ -72,6 +80,7 @@ def _interp(src_t, src_xyz, tgt_t):
     src_t = src_t[order]
     src_xyz = src_xyz[order]
 
+    # Remove duplicate timestamps to keep np.interp well-defined.
     uniq_t, uniq_idx = np.unique(src_t, return_index=True)
     src_t = uniq_t
     src_xyz = src_xyz[uniq_idx]
@@ -84,19 +93,13 @@ def _interp(src_t, src_xyz, tgt_t):
         out[mask, i] = np.interp(tgt_t[mask], src_t, src_xyz[:, i])
     return out
 
-def _rmse(gt: np.ndarray, est: np.ndarray):
-    """
-    Per-time-step RMSE across components.
-    gt, est: (N, d)
-    returns:
-      rmse: (N,)
-      err:  (N, d)
-    """
-    err = est - gt
-    rmse = np.sqrt(np.mean(err**2, axis=1))
-    return rmse, err
 
 def _interp_cov6(src_t, src_cov6, tgt_t):
+    """
+    Interpolate the 6 upper-triangle elements [xx, xy, xz, yy, yz, zz]
+    of a symmetric 3×3 covariance matrix onto tgt_t.
+    Samples outside the source range are left as NaN.
+    """
     src_t    = np.asarray(src_t,    dtype=float)
     src_cov6 = np.asarray(src_cov6, dtype=float)
     tgt_t    = np.asarray(tgt_t,    dtype=float)
@@ -122,6 +125,12 @@ def _valid_rows(a, b):
 
 
 def _position_error(gt_xyz, est_xyz):
+    """
+    Returns:
+        dist: Euclidean position error per valid timestep, shape (M,)
+        err: component-wise error per valid timestep, shape (M, 3)
+        valid: boolean mask over original rows, shape (N,)
+    """
     valid = _valid_rows(gt_xyz, est_xyz)
     err = est_xyz[valid] - gt_xyz[valid]
     dist = np.linalg.norm(err, axis=1)
@@ -136,6 +145,7 @@ def _path_length(xyz: np.ndarray) -> float:
 
 
 def _cov6_has_data(cov6) -> bool:
+    """True only if the covariance array exists and contains non-trivial values."""
     if cov6 is None:
         return False
     finite = cov6[np.isfinite(cov6)]
@@ -147,6 +157,19 @@ def _cov6_has_data(cov6) -> bool:
 # ============================================================
 
 def _compute_nees(errors: np.ndarray, cov6: np.ndarray) -> np.ndarray:
+    """
+    Compute per-timestep NEES = err^T P^{-1} err.
+
+    Parameters
+    ----------
+    errors : (N, 3)  estimation errors (est − gt)
+    cov6   : (N, 6)  upper-triangle of 3×3 position covariance
+                     columns: [xx, xy, xz, yy, yz, zz]
+
+    Returns
+    -------
+    nees : (N,) — NaN for non-finite or singular rows.
+    """
     valid = np.isfinite(errors).all(axis=1) & np.isfinite(cov6).all(axis=1)
     nees  = np.full(len(errors), np.nan)
     if not valid.any():
@@ -173,6 +196,23 @@ def _compute_nees(errors: np.ndarray, cov6: np.ndarray) -> np.ndarray:
 
 def _compute_nis(innovations: np.ndarray, cov6: np.ndarray,
                  R_diag: np.ndarray) -> np.ndarray:
+    """
+    Compute per-measurement NIS = ν^T S^{-1} ν   where   S = P_pos + R.
+
+    Parameters
+    ----------
+    innovations : (N, 3)  z − H x   (GNSS NED minus ASV position estimate)
+    cov6        : (N, 6)  position covariance at measurement times
+    R_diag      : (3,)    diagonal of the GNSS noise covariance R
+
+    Returns
+    -------
+    nis : (N,) — NaN for non-finite or singular rows.
+
+    Note: ISAM2 is a smoother, so x here is the *posterior* (the measurement
+    was already fused). The resulting NIS reflects smoother residuals, not
+    classical filter innovations, and will be smaller than a forward filter NIS.
+    """
     valid = np.isfinite(innovations).all(axis=1) & np.isfinite(cov6).all(axis=1)
     nis   = np.full(len(innovations), np.nan)
     if not valid.any():
@@ -200,6 +240,7 @@ def _compute_nis(innovations: np.ndarray, cov6: np.ndarray,
 
 
 def _chi2_panel(ax, t, values, color, title):
+    """Draw a NEES or NIS time-series with chi² bounds on ax."""
     win = max(1, len(values) // 20)
     avg = np.convolve(
         np.where(np.isfinite(values), values, 0.0),
@@ -295,15 +336,14 @@ class PlotterCSVJoint:
     scenario_name: str = "Joint scenario"
     save_dir: str | None = None
 
+    # Optional: path to the GNSS CSV logged by csv_logger_node (enables NIS).
     gnss_csv: str | None = None
+    # GNSS noise sigmas in metres — must match the values used in the FGO node.
     gps_sigma_ne: float = 0.3
     gps_sigma_d:  float = 0.5
+    # Optional extras stored for reference; not used by current plot methods.
     usbl_csv:    str | None = None
     scenario_id: int | None = None
-
-    # --- velocity column names in estimate CSVs ---
-    asv_vel_cols: tuple = ("vx", "vy", "vz")
-    rov_vel_cols: tuple = ("vx", "vy", "vz")
 
     def _load(self):
         rov_gt_df  = _load_csv(self.rov_gt_csv)
@@ -311,6 +351,7 @@ class PlotterCSVJoint:
         rov_est_df = _load_csv(self.rov_est_csv)
         asv_est_df = _load_csv(self.asv_est_csv)
 
+        # ── ROV: filter by rov_id and mark unavailable if CSV is empty ──────────
         self._rov_available = True
         if "rov_id" in rov_gt_df.columns and "rov_id" in rov_est_df.columns:
             mode_result = rov_est_df["rov_id"].mode()
@@ -333,9 +374,6 @@ class PlotterCSVJoint:
         self.asv_gt    = _xyz(asv_gt_df,  "x_n", "y_e", "z_d")
         self.asv_est   = _xyz(asv_est_df, "x",   "y",   "z")
 
-        # velocities
-        self.asv_vel = _xyz(asv_est_df, *self.asv_vel_cols)
-
         self.asv_gt_t_rel  = self.asv_gt_t  - self.asv_gt_t[0]
         self.asv_est_t_rel = self.asv_est_t - self.asv_est_t[0]
 
@@ -344,8 +382,8 @@ class PlotterCSVJoint:
         self.asv_gt_eval       = self.asv_gt[asv_mask]
         self.asv_gt_eval_t_rel = self.asv_gt_eval_t - self.asv_gt_eval_t[0]
         self.asv_est_i         = _interp(self.asv_est_t, self.asv_est, self.asv_gt_eval_t)
-        self.asv_vel_i         = _interp(self.asv_est_t, self.asv_vel, self.asv_gt_eval_t)
 
+        # ── ROV arrays (only when data is present) ────────────────────────────
         if self._rov_available:
             self.rov_gt_t = _gt_time(rov_gt_df)
             if "time" not in rov_est_df.columns:
@@ -353,8 +391,6 @@ class PlotterCSVJoint:
             self.rov_est_t     = _fix_est_time(rov_est_df["time"].to_numpy(dtype=float), self.rov_gt_t)
             self.rov_gt        = _xyz(rov_gt_df,  "x_n", "y_e", "z_d")
             self.rov_est       = _xyz(rov_est_df, "x",   "y",   "z")
-            self.rov_vel       = _xyz(rov_est_df, *self.rov_vel_cols)
-
             self.rov_gt_t_rel  = self.rov_gt_t  - self.rov_gt_t[0]
             self.rov_est_t_rel = self.rov_est_t - self.rov_est_t[0]
             rov_mask = ((self.rov_gt_t >= self.rov_est_t.min()) &
@@ -363,25 +399,28 @@ class PlotterCSVJoint:
             self.rov_gt_eval       = self.rov_gt[rov_mask]
             self.rov_gt_eval_t_rel = self.rov_gt_eval_t - self.rov_gt_eval_t[0]
             self.rov_est_i         = _interp(self.rov_est_t, self.rov_est, self.rov_gt_eval_t)
-            self.rov_vel_i         = _interp(self.rov_est_t, self.rov_vel, self.rov_gt_eval_t)
         else:
             self.rov_gt_t          = np.array([])
             self.rov_est_t         = np.array([])
             self.rov_gt            = np.empty((0, 3))
             self.rov_est           = np.empty((0, 3))
-            self.rov_vel           = np.empty((0, 3))
+            self.rov_gt_t_rel      = np.array([])
+            self.rov_est_t_rel     = np.array([])
             self.rov_gt_eval_t     = np.array([])
             self.rov_gt_eval       = np.empty((0, 3))
+            self.rov_gt_eval_t_rel = np.array([])
             self.rov_est_i         = np.empty((0, 3))
-            self.rov_vel_i         = np.empty((0, 3))
 
+        # ── Position covariance (for NEES) ────────────────────────────────────
+        # Columns written by csv_logger_node:
+        #   pos_cov_xx, pos_cov_xy, pos_cov_xz, pos_cov_yy, pos_cov_yz, pos_cov_zz
         cov_cols = ['pos_cov_xx', 'pos_cov_xy', 'pos_cov_xz',
                     'pos_cov_yy', 'pos_cov_yz', 'pos_cov_zz']
 
         if all(c in asv_est_df.columns for c in cov_cols):
             asv_cov6_raw       = asv_est_df[cov_cols].to_numpy(dtype=float)
             self.asv_cov6_i    = _interp_cov6(self.asv_est_t, asv_cov6_raw, self.asv_gt_eval_t)
-            self._asv_cov6_raw = asv_cov6_raw
+            self._asv_cov6_raw = asv_cov6_raw   # kept for NIS (interpolated to GNSS times)
         else:
             self.asv_cov6_i    = None
             self._asv_cov6_raw = None
@@ -392,6 +431,7 @@ class PlotterCSVJoint:
         else:
             self.rov_cov6_i = None
 
+        # ── GNSS measurements (for NIS) ───────────────────────────────────────
         if self.gnss_csv:
             gnss_df      = _load_csv(self.gnss_csv)
             self.gnss_t  = _fix_est_time(gnss_df["time"].to_numpy(float), self.asv_gt_t)
@@ -400,7 +440,7 @@ class PlotterCSVJoint:
             self.gnss_t   = None
             self.gnss_ned = None
 
-    # ── 3D trajectory ─────────────────────────────────────────
+    # ── 3D trajectory ─────────────────────────────────────────────────────────
 
     def plot3d(self):
         self._load()
@@ -431,107 +471,160 @@ class PlotterCSVJoint:
         fig.tight_layout()
         return fig
 
-    # ── RMSE (pos+vel per platform) ───────────────────────────
+    # ── Position error ────────────────────────────────────────────────────────
 
-    def plot_rmse_rov(self):
+    def plot_position_error(self):
         self._load()
-        if not self._rov_available:
-            return None
 
-        fig, axs = plt.subplots(2, 1, figsize=(10, 6), sharex=False)
+        asv_err_norm, _, asv_valid = _position_error(self.asv_gt_eval, self.asv_est_i)
 
-        rmse_pos, _ = _rmse(self.rov_gt_eval, self.rov_est_i)
-        rmse_vel, _ = _rmse(np.gradient(self.rov_gt_eval, self.rov_gt_eval_t, axis=0), self.rov_vel_i)
+        n_rows = 2 if self._rov_available else 1
+        fig, axs = plt.subplots(n_rows, 1, figsize=(10, 3 * n_rows + 1), sharex=False,
+                                squeeze=False)
 
-        axs[0].plot(self.rov_gt_eval_t_rel, rmse_pos, color="C0", label="ROV pos RMSE")
-        axs[0].set_title("ROV Position RMSE")
-        axs[0].set_ylabel("RMSE [m]")
-        axs[0].grid(True); axs[0].legend()
+        if self._rov_available:
+            rov_err_norm, _, rov_valid = _position_error(self.rov_gt_eval, self.rov_est_i)
+            axs[0, 0].plot(self.rov_gt_eval_t_rel[rov_valid], rov_err_norm,
+                           label="ROV position error", color="C0")
+            axs[0, 0].set_ylabel("Error [m]")
+            axs[0, 0].set_title("ROV Position Error")
+            axs[0, 0].grid(True)
+            axs[0, 0].legend()
+            asv_ax = axs[1, 0]
+        else:
+            asv_ax = axs[0, 0]
 
-        axs[1].plot(self.rov_gt_eval_t_rel, rmse_vel, color="C1", label="ROV vel RMSE")
-        axs[1].set_title("ROV Velocity RMSE")
-        axs[1].set_ylabel("RMSE [m/s]")
-        axs[1].set_xlabel("Time [s]")
-        axs[1].grid(True); axs[1].legend()
+        asv_ax.plot(self.asv_gt_eval_t_rel[asv_valid], asv_err_norm,
+                    label="ASV position error", color="C3")
+        asv_ax.set_xlabel("Time [s]")
+        asv_ax.set_ylabel("Error [m]")
+        asv_ax.set_title("ASV Position Error")
+        asv_ax.grid(True)
+        asv_ax.legend()
 
-        fig.suptitle(f"{self.scenario_name} — ROV RMSE")
+        fig.suptitle(f"{self.scenario_name} - Position Errors")
         fig.tight_layout()
         return fig
 
-    def plot_rmse_asv(self):
+    def plot_position_error_components(self, platform="ROV"):
         self._load()
 
-        fig, axs = plt.subplots(2, 1, figsize=(10, 6), sharex=False)
+        platform = platform.upper()
+        if platform == "ROV":
+            if not self._rov_available:
+                raise ValueError("No ROV estimates available — skipping ROV component error plot.")
+            gt_t, gt, est_i = self.rov_gt_eval_t_rel, self.rov_gt_eval, self.rov_est_i
+        elif platform == "ASV":
+            gt_t, gt, est_i = self.asv_gt_eval_t_rel, self.asv_gt_eval, self.asv_est_i
+        else:
+            raise ValueError("platform must be either 'ROV' or 'ASV'")
 
-        rmse_pos, _ = _rmse(self.asv_gt_eval, self.asv_est_i)
-        rmse_vel, _ = _rmse(np.gradient(self.asv_gt_eval, self.asv_gt_eval_t, axis=0), self.asv_vel_i)
+        valid = _valid_rows(gt, est_i)
+        t     = gt_t[valid]
+        err   = est_i[valid] - gt[valid]
 
-        axs[0].plot(self.asv_gt_eval_t_rel, rmse_pos, color="C3", label="ASV pos RMSE")
-        axs[0].set_title("ASV Position RMSE")
-        axs[0].set_ylabel("RMSE [m]")
-        axs[0].grid(True); axs[0].legend()
+        labels = ["North", "East", "Down"]
+        colors = ["C0", "C1", "C2"]
 
-        axs[1].plot(self.asv_gt_eval_t_rel, rmse_vel, color="C4", label="ASV vel RMSE")
-        axs[1].set_title("ASV Velocity RMSE")
-        axs[1].set_ylabel("RMSE [m/s]")
-        axs[1].set_xlabel("Time [s]")
-        axs[1].grid(True); axs[1].legend()
+        fig, axs = plt.subplots(3, 1, figsize=(10, 7), sharex=True)
+        for i in range(3):
+            axs[i].plot(t, err[:, i], color=colors[i])
+            axs[i].set_ylabel(f"{labels[i]} error [m]")
+            axs[i].grid(True)
 
-        fig.suptitle(f"{self.scenario_name} — ASV RMSE")
+        axs[-1].set_xlabel("Time [s]")
+        fig.suptitle(f"{self.scenario_name} - {platform} Position Error Components")
         fig.tight_layout()
         return fig
 
-    # ── NEES (pos+vel) ─────────────────────────────────────────
+    # ── NEES ──────────────────────────────────────────────────────────────────
 
     def plot_nees(self):
+        """
+        Plot Normalized Estimation Error Squared (NEES) for each platform
+        that has published non-zero position covariance.
+
+        A consistent estimator has NEES ~ chi²(3):  mean ≈ 3,  95 % of
+        individual samples inside [{lo:.2f}, {hi:.2f}].
+        """.format(lo=_CHI2_3_LO, hi=_CHI2_3_HI)
         self._load()
 
         has_asv = _cov6_has_data(self.asv_cov6_i)
         has_rov = _cov6_has_data(self.rov_cov6_i)
 
         if not has_asv and not has_rov:
-            raise ValueError("No non-zero covariance found in estimated CSVs.")
+            raise ValueError(
+                "No non-zero covariance found in any estimated CSV. "
+                "Make sure the FGO node publishes covariance and the CSV was "
+                "recorded with the updated csv_logger_node."
+            )
 
-        fig, axs = plt.subplots(2, 1, figsize=(10, 8), squeeze=False)
-
+        panels = []
         if has_asv:
-            valid = (_valid_rows(self.asv_gt_eval, self.asv_est_i)
-                     & np.isfinite(self.asv_cov6_i).all(axis=1))
+            valid  = (_valid_rows(self.asv_gt_eval, self.asv_est_i)
+                      & np.isfinite(self.asv_cov6_i).all(axis=1))
             errors = self.asv_est_i[valid] - self.asv_gt_eval[valid]
-            nees = _compute_nees(errors, self.asv_cov6_i[valid])
-            _chi2_panel(axs[0, 0], self.asv_gt_eval_t_rel[valid], nees, "C3", "ASV Position NEES")
-
+            nees   = _compute_nees(errors, self.asv_cov6_i[valid])
+            panels.append(("ASV", self.asv_gt_eval_t_rel[valid], nees, "C3"))
         if has_rov:
-            valid = (_valid_rows(self.rov_gt_eval, self.rov_est_i)
-                     & np.isfinite(self.rov_cov6_i).all(axis=1))
+            valid  = (_valid_rows(self.rov_gt_eval, self.rov_est_i)
+                      & np.isfinite(self.rov_cov6_i).all(axis=1))
             errors = self.rov_est_i[valid] - self.rov_gt_eval[valid]
-            nees = _compute_nees(errors, self.rov_cov6_i[valid])
-            _chi2_panel(axs[1, 0], self.rov_gt_eval_t_rel[valid], nees, "C0", "ROV Position NEES")
+            nees   = _compute_nees(errors, self.rov_cov6_i[valid])
+            panels.append(("ROV", self.rov_gt_eval_t_rel[valid], nees, "C0"))
+
+        fig, axs = plt.subplots(len(panels), 1,
+                                figsize=(10, 4 * len(panels)), squeeze=False)
+        for ax, (name, t, nees, color) in zip(axs[:, 0], panels):
+            _chi2_panel(ax, t, nees, color, f"{name} Position NEES")
 
         axs[-1, 0].set_xlabel("Time [s]")
         fig.suptitle(f"{self.scenario_name} - NEES")
         fig.tight_layout()
         return fig
 
-    # ── NIS ───────────────────────────────────────────────────
+    # ── NIS ───────────────────────────────────────────────────────────────────
 
     def plot_nis(self):
+        """
+        Plot Normalized Innovation Squared (NIS) for GNSS vs the ASV
+        posterior position estimate.
+
+        Innovation:  ν = z_gnss − x_est  (both in NED frame).
+        Innovation covariance:  S = P_pos + R_gnss.
+
+        Because ISAM2 is a smoother, x_est here is the *posterior* — the GNSS
+        measurement has already been fused.  The NIS therefore reflects
+        smoother residuals, not forward-filter innovations, and will generally
+        be smaller than chi²(3).  It is still a useful consistency indicator:
+        large spikes reveal measurement outliers or modelling errors.
+        """
         self._load()
 
         if self.gnss_t is None:
-            raise ValueError("gnss_csv is not set.")
+            raise ValueError(
+                "gnss_csv is not set.  Pass the path to the GNSS CSV produced "
+                "by csv_logger_node to enable NIS plots."
+            )
         if self._asv_cov6_raw is None:
-            raise ValueError("No covariance columns found in ASV estimated CSV.")
+            raise ValueError(
+                "No covariance columns found in the ASV estimated CSV. "
+                "Make sure the FGO node publishes covariance."
+            )
 
+        # Restrict to GNSS samples within the ASV estimate time window.
         t_min = self.asv_est_t.min()
         t_max = self.asv_est_t.max()
         mask  = (self.gnss_t >= t_min) & (self.gnss_t <= t_max)
         if not mask.any():
-            raise ValueError("No GNSS measurements overlap with the ASV estimate time range.")
+            raise ValueError(
+                "No GNSS measurements overlap with the ASV estimate time range."
+            )
 
         gnss_t   = self.gnss_t[mask]
         gnss_ned = self.gnss_ned[mask]
 
+        # Interpolate ASV position and covariance to GNSS measurement times.
         asv_pos_at_gnss  = _interp(self.asv_est_t, self.asv_est, gnss_t)
         asv_cov6_at_gnss = _interp_cov6(self.asv_est_t, self._asv_cov6_raw, gnss_t)
 
@@ -552,7 +645,7 @@ class PlotterCSVJoint:
         fig.tight_layout()
         return fig
 
-    # ── Statistics ────────────────────────────────────────────
+    # ── Statistics ────────────────────────────────────────────────────────────
 
     def export_statistics(self):
         self._load()
@@ -560,16 +653,32 @@ class PlotterCSVJoint:
 
         if self._rov_available:
             rov_stats = _error_statistics(self.rov_gt_eval, self.rov_est_i)
+            if _cov6_has_data(self.rov_cov6_i):
+                valid = (_valid_rows(self.rov_gt_eval, self.rov_est_i)
+                         & np.isfinite(self.rov_cov6_i).all(axis=1))
+                nees  = _compute_nees(
+                    self.rov_est_i[valid] - self.rov_gt_eval[valid],
+                    self.rov_cov6_i[valid],
+                )
+                rov_stats["mean_nees"] = float(np.nanmean(nees))
             rov_stats.update({"scenario": self.scenario_name, "platform": "ROV"})
             rows.append(rov_stats)
 
         asv_stats = _error_statistics(self.asv_gt_eval, self.asv_est_i)
+        if _cov6_has_data(self.asv_cov6_i):
+            valid = (_valid_rows(self.asv_gt_eval, self.asv_est_i)
+                     & np.isfinite(self.asv_cov6_i).all(axis=1))
+            nees  = _compute_nees(
+                self.asv_est_i[valid] - self.asv_gt_eval[valid],
+                self.asv_cov6_i[valid],
+            )
+            asv_stats["mean_nees"] = float(np.nanmean(nees))
         asv_stats.update({"scenario": self.scenario_name, "platform": "ASV"})
         rows.append(asv_stats)
 
         return pd.DataFrame(rows)
 
-    # ── Save all ─────────────────────────────────────────────
+    # ── Save all ──────────────────────────────────────────────────────────────
 
     def save_all(self):
         if not self.save_dir:
@@ -579,33 +688,35 @@ class PlotterCSVJoint:
         path.mkdir(parents=True, exist_ok=True)
 
         fig1 = self.plot3d()
-        fig_rmse_asv = self.plot_rmse_asv()
-        fig_rmse_rov = self.plot_rmse_rov()
-        fig_nees = self.plot_nees()
+        fig2 = self.plot_position_error()
+        fig4 = self.plot_position_error_components("ASV")
         stat_csv = self.export_statistics()
 
-        fig1.savefig(path / "traj_3d.png", dpi=150, bbox_inches="tight")
-        if fig_rmse_asv:
-            fig_rmse_asv.savefig(path / "rmse_asv.png", dpi=150, bbox_inches="tight")
-        if fig_rmse_rov:
-            fig_rmse_rov.savefig(path / "rmse_rov.png", dpi=150, bbox_inches="tight")
-        if fig_nees:
-            fig_nees.savefig(path / "nees.png", dpi=150, bbox_inches="tight")
+        fig1.savefig(path / "traj_3d.png",                       dpi=150, bbox_inches="tight")
+        fig2.savefig(path / "position_error.png",                dpi=150, bbox_inches="tight")
+        fig4.savefig(path / "asv_position_error_components.png", dpi=150, bbox_inches="tight")
         stat_csv.to_csv(path / "fgo_statistics.csv", index=False)
+        plt.close(fig1); plt.close(fig2); plt.close(fig4)
 
-        plt.close(fig1)
-        if fig_rmse_asv:
-            plt.close(fig_rmse_asv)
-        if fig_rmse_rov:
-            plt.close(fig_rmse_rov)
-        if fig_nees:
-            plt.close(fig_nees)
+        try:
+            fig3 = self.plot_position_error_components("ROV")
+            fig3.savefig(path / "rov_position_error_components.png", dpi=150, bbox_inches="tight")
+            plt.close(fig3)
+        except ValueError as exc:
+            print(f"[plotting] Skipping ROV component error: {exc}")
+
+        try:
+            fig5 = self.plot_nees()
+            fig5.savefig(path / "nees.png", dpi=150, bbox_inches="tight")
+            plt.close(fig5)
+        except ValueError as exc:
+            print(f"[plotting] Skipping NEES: {exc}")
 
         if self.gnss_csv:
             try:
-                fig_nis = self.plot_nis()
-                fig_nis.savefig(path / "nis.png", dpi=150, bbox_inches="tight")
-                plt.close(fig_nis)
+                fig6 = self.plot_nis()
+                fig6.savefig(path / "nis.png", dpi=150, bbox_inches="tight")
+                plt.close(fig6)
             except ValueError as exc:
                 print(f"[plotting] Skipping NIS: {exc}")
 
@@ -615,3 +726,19 @@ class PlotterCSVJoint:
         if self.save_dir:
             self.save_all()
         plt.show(block=True)
+
+
+# ============================================================
+# Quick local test
+# ============================================================
+if __name__ == "__main__":
+    plotter1 = PlotterCSVJoint(
+        rov_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/8a/rov_ground_truth.csv",
+        asv_gt_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/simulation_data/8a/asv_ground_truth.csv",
+        rov_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/debugging/test/rov_estimated_my_experiment_01.csv",
+        asv_est_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/debugging/test/boat_estimated_my_experiment_01.csv",
+        scenario_name="FGO - Scenario 1: Bearing-only",
+        save_dir="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/debugging/test/plots_s1",
+        gnss_csv="microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/debugging/test/gnss_my_experiment_01.csv",
+    )
+    plotter1.show()

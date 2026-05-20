@@ -71,7 +71,35 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
-  # ament_lint_auto_find_test_dependencies()
+
+  # --- USBL Jacobian test ----------------------------------------------------
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_usbl_jacobian
+    test/test_usbl_jacobian.cpp
+    src/rov_factors.cpp
+  )
+
+  target_include_directories(test_usbl_jacobian PRIVATE
+    include
+    ${GTSAM_INCLUDE_DIR}
+    ${EIGEN3_INCLUDE_DIR}
+  )
+
+  target_link_libraries(test_usbl_jacobian
+    gtsam
+    Eigen3::Eigen
+  )
+
+  ament_target_dependencies(test_usbl_jacobian
+    rclcpp
+    sensor_msgs
+    geometry_msgs
+    nav_msgs
+    tf2_ros
+    blueboat_interfaces
+  )
 endif()
+
 
 ament_package()

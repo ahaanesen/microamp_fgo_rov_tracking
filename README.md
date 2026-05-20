@@ -18,6 +18,7 @@ ros2 run microamp_fgo_rov_tracking fgo_tracking_node --ros-args -p scenario_id:=
 In a new terminal:
 ```
 ros2 bag play /tmp/fgo_dataset --clock
+ros2 bag play src/microamp_fgo_rov_tracking/post_processing/simulation_data/circular_no_delay_no_loss --clock
 ```
 
 Whenever code changes, the program needs to be built again to apply them using

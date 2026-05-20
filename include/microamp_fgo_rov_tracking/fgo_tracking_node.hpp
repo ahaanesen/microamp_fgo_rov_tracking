@@ -77,7 +77,7 @@ private:
 
   gtsam::Key getRovKey(unsigned char prefix, uint32_t rov_id, uint32_t step_count);
   gtsam::Key getAsvKeyForRovAssociation(double current_asv_time, uint64_t current_asv_index, double rov_time);
-  void rovUpdateWithUsbl(uint8_t rov_id, double rov_time, gtsam::Key associated_asv_key, const USBLMessage::SharedPtr& usbl_msg);
+  bool rovUpdateWithUsbl(uint8_t rov_id, double rov_time, gtsam::Key associated_asv_key, const USBLMessage::SharedPtr& usbl_msg);
 
   // ==================== GTSAM CORE ====================
   gtsam::Values updateAndGetEstimate();

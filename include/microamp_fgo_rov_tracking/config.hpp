@@ -55,8 +55,8 @@ struct FgoConfig {
   // Q matrix uses DWPA formulation: Q_pp = sigma^2 * dt^4/4,
   //                                 Q_pv = sigma^2 * dt^3/2,
   //                                 Q_vv = sigma^2 * dt^2.
-  double rov_cv_continous_sigma{0.20};   // m/s²
-  double rov_process_vel_sigma{0.20};    // kept for compatibility
+  double rov_cv_continous_sigma{0.020};   // m/s²
+  double rov_process_vel_sigma{0.20};    // not really used
 
   // ROV priors
   double rov_prior_pos_sigma{2.0};
@@ -69,7 +69,7 @@ struct FgoConfig {
   double rov_depth_sigma{0.3};
 
   // Bearing-only: weak depth stabilising prior
-  bool   use_rov_depth_prior{true};
+  bool   use_rov_depth_prior{false};
   double rov_depth_prior_mean{10.0};
   double rov_depth_prior_sigma{10.0};
 };

@@ -47,22 +47,25 @@ Vector UsblFactor::evaluateError(
     double x = p_world.x();
     double y = p_world.y();
     double z = p_world.z();
-    double r2 = x * x + y * y;
-    double r = std::sqrt(r2);
-    double rho2 = r2 + z * z;
-    const double epsilon = 1e-6;
+    double rho2 = x * x + y * y + z * z;
+
+    // Clamp the horizontal distance to avoid division by zero when the ROV
+    // is nearly directly above or below the USBL transducer.
+    double r_raw = std::sqrt(x * x + y * y);
+    double r     = std::max(r_raw, 1e-3);
+    double r2    = r * r;
 
     double expAz = std::atan2(y, x);
     if (expAz < 0.0) {
         expAz += 2.0 * M_PI;
     }
-    double expEl = std::atan2(z, r);
+    double expEl = std::atan2(z, r_raw);
 
     double errAz = wrapToPi(expAz - measAzimuthRad);
     double errEl = expEl - measElevationRad;
 
     gtsam::Matrix23 H_angles_world = gtsam::Matrix23::Zero();
-    if (r2 > epsilon && r > epsilon && rho2 > epsilon) {
+    if (rho2 > 1e-6) {
         H_angles_world << -y / r2, x / r2, 0.0,
                           -x * z / (rho2 * r), -y * z / (rho2 * r), r / rho2;
     }

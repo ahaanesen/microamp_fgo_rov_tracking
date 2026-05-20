@@ -21,15 +21,21 @@ gtsam::Pose3 getBodyToUsblPose(const EnvConfig& env_config) {
   return gtsam::Pose3(usbl_rotation, usbl_offset);
 }
 
-// Build ISAM2Params with tuning suited for nonlinear USBL bearing factors.
-// Lower relinearizeThreshold and relinearizeSkip=1 ensure the bearing
-// Jacobians are refreshed every update rather than being stale for up to
-// 10 steps (the GTSAM default), which degrades convergence significantly
-// when position uncertainty is still large (early tracking phase).
 static gtsam::ISAM2Params make_isam2_params() {
   gtsam::ISAM2Params p;
-  p.relinearizeThreshold = 0.01;  // default 0.1
-  p.relinearizeSkip      = 1;      // default 10 — relinearize every update
+  // p.relinearizeThreshold = 0.01;  // default 0.1
+  // p.relinearizeSkip      = 1;      // default 10 — relinearize every update
+  gtsam::ISAM2GaussNewtonParams gn;
+  gn.wildfireThreshold = 1e-3;
+  p.optimizationParams = gn;  // std::variant assignment in 4.3a
+
+  p.factorization          = gtsam::ISAM2Params::CHOLESKY; 
+  p.relinearizeThreshold   = 0.01;
+  p.relinearizeSkip        = 1;
+  p.enableRelinearization  = true;
+  p.evaluateNonlinearError = false;
+  p.cacheLinearizedFactors = true;
+
   return p;
 }
 
@@ -52,6 +58,7 @@ FactorGraphTrackingNode::FactorGraphTrackingNode()
   auto default_datum_h = 0.0;
   ned_.setDatum(default_datum_lat, default_datum_lon, default_datum_h);
   datum_initialised_ = true;
+  // datum_initialised_ = false;
 
   // ------------------------------------------------------------------
   // IMU Preintegration (NED)
@@ -173,6 +180,10 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
     return;
   }
 
+  // if (!datum_initialised_) {
+  //   initializeDatumFromGNSS(*gnss_msg);
+  // }
+
   if (!graph_initialised_) {
     if (ne_init_ == std::tuple<double, double>{0.0, 0.0}) {
       NedCoordinates ned_coords = ned_.gnssToNED(gnss_msg->lat, gnss_msg->lon, gnss_msg->height);
@@ -238,18 +249,35 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
     if (!rov_initialised_[rov_id]) {
       initializeNewRov(associated_asv_key, usbl_msg);
       rov_initialised_[rov_id] = true;
-      // rov_step_counters_ and last_rov_timestamp_ are set inside initializeNewRov
-    } else {
-      rovUpdateWithUsbl(rov_id, rov_time, associated_asv_key, usbl_msg);
-      // Increment immediately so the next iteration (if any) uses the correct key
+      // Advance to step 1 so the first rovUpdateWithUsbl call uses step 0 as r_prev.
+      // Without this, current_rov_step would be 0 and r_prev would underflow to UINT32_MAX.
       rov_step_counters_[rov_id] += 1;
-      last_rov_timestamp_[rov_id] = rov_time;
+    } else {
+      
+      if (rovUpdateWithUsbl(rov_id, rov_time, associated_asv_key, usbl_msg)) {
+        rov_step_counters_[rov_id] += 1;
+        last_rov_timestamp_[rov_id] = rov_time;
+      }
+      // rovUpdateWithUsbl(rov_id, rov_time, associated_asv_key, usbl_msg);
+      // // Increment immediately so the next iteration (if any) uses the correct key
+      // rov_step_counters_[rov_id] += 1;
+      // last_rov_timestamp_[rov_id] = rov_time;
     }
 
     usbl_queue_.pop_front();
   }
 
   // 6. Graph optimization (first pass)
+  RCLCPP_INFO(get_logger(), "Graph before update: %zu factors, %zu values",
+              graph_.size(), values_.size());
+  for (const auto& kv : values_) {
+    RCLCPP_INFO(get_logger(), "  key %lu  dim %zu",
+                kv.key, kv.value.dim());
+  }
+  if (graph_.size() > 0) {
+    graph_.print("Factors:\n");
+  }
+
   isam2_.update(graph_, values_);
   graph_.resize(0);
   values_.clear();
@@ -257,7 +285,7 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
   // Extra optimization pass with no new factors: improves convergence for the
   // nonlinear USBL bearing factors, especially early in tracking when position
   // uncertainty is still large and the linearisation point changes significantly.
-  isam2_.update();
+  // isam2_.update();
 
   // 7. Housekeeping
   bias_ = isam2_.calculateEstimate<gtsam::imuBias::ConstantBias>(B(curr_asv_index));
@@ -281,10 +309,20 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
 // HELPERS
 // ============================================================
 
+// gtsam::Key FactorGraphTrackingNode::getRovKey(
+//     unsigned char prefix, uint32_t rov_id, uint32_t step_count) {
+//   uint64_t packed_index = (uint64_t(rov_id) << 32) | step_count;
+//   return gtsam::Symbol(prefix, packed_index);
+// }
 gtsam::Key FactorGraphTrackingNode::getRovKey(
     unsigned char prefix, uint32_t rov_id, uint32_t step_count) {
-  uint64_t packed_index = (uint64_t(rov_id) << 32) | step_count;
-  return gtsam::Symbol(prefix, packed_index);
+  // Encode as a flat index: rov_id * MAX_STEPS + step_count.
+  // MAX_STEPS must exceed the maximum number of acoustic updates
+  // expected in any mission; 1000000 is safe for all practical cases.
+  constexpr uint64_t MAX_STEPS = 1'000'000ULL;
+  uint64_t flat_index = static_cast<uint64_t>(rov_id) * MAX_STEPS
+                      + static_cast<uint64_t>(step_count);
+  return gtsam::Symbol(prefix, flat_index);
 }
 
 gtsam::Key FactorGraphTrackingNode::getAsvKeyForRovAssociation(
@@ -305,7 +343,7 @@ gtsam::Key FactorGraphTrackingNode::getAsvKeyForRovAssociation(
   return closest_asv_key;
 }
 
-void FactorGraphTrackingNode::rovUpdateWithUsbl(
+bool FactorGraphTrackingNode::rovUpdateWithUsbl(
     uint8_t rov_id,
     double  rov_time,
     gtsam::Key associated_asv_key,
@@ -316,7 +354,7 @@ void FactorGraphTrackingNode::rovUpdateWithUsbl(
     RCLCPP_WARN(get_logger(),
                 "Non-positive dt for ROV %d: %.6f, skipping USBL measurement",
                 rov_id, dt_rov);
-    return;
+    return false;
   }
 
   uint32_t current_rov_step = rov_step_counters_[rov_id];
@@ -342,29 +380,32 @@ void FactorGraphTrackingNode::rovUpdateWithUsbl(
   values_.insert(r_curr, (r_pred + w_pred * dt_rov).eval());
   values_.insert(w_curr, w_pred.eval());
 
-  // CV process-noise covariance — DWPA formulation (matches ESKF ModelCV):
-  //   Q_pp = sigma^2 * dt^4/4
-  //   Q_pv = sigma^2 * dt^3/2
-  //   Q_vv = sigma^2 * dt^2
-  // Previously used CWNA (dt^3/3 in position block), which is correct per se
-  // but inconsistent with the ESKF and subtly different in scaling.
-  const double q_h = fgo_config_.rov_cv_continous_sigma * fgo_config_.rov_cv_continous_sigma;
-  const double q_v = q_h * 0.1;  // Down axis: 10x tighter (ROV moves mostly horizontally)
-  const double dt2 = dt_rov * dt_rov;
-  const double dt3 = dt2  * dt_rov;
-  const double dt4 = dt3  * dt_rov;
+  const double sigma_a = fgo_config_.rov_cv_continous_sigma;  // m/s²
+  const double sigma_p_h = sigma_a * dt_rov * dt_rov / 2.0;   // horizontal pos
+  const double sigma_p_v = sigma_a * dt_rov * dt_rov / 2.0 * std::sqrt(0.1);
+  const double sigma_v_h = sigma_a * dt_rov;                  // horizontal vel
+  const double sigma_v_v = sigma_a * dt_rov * std::sqrt(0.1);
 
-  gtsam::Matrix66 cov = gtsam::Matrix66::Zero();
-  // Position-position block
-  cov(0,0) = q_h * dt4 / 4.0;  cov(1,1) = q_h * dt4 / 4.0;  cov(2,2) = q_v * dt4 / 4.0;
-  // Position-velocity cross terms
-  cov(0,3) = q_h * dt3 / 2.0;  cov(3,0) = q_h * dt3 / 2.0;
-  cov(1,4) = q_h * dt3 / 2.0;  cov(4,1) = q_h * dt3 / 2.0;
-  cov(2,5) = q_v * dt3 / 2.0;  cov(5,2) = q_v * dt3 / 2.0;
-  // Velocity-velocity block
-  cov(3,3) = q_h * dt2;         cov(4,4) = q_h * dt2;         cov(5,5) = q_v * dt2;
+  auto cv_noise = gtsam::noiseModel::Diagonal::Sigmas(
+      (gtsam::Vector(6) << sigma_p_h, sigma_p_h, sigma_p_v,
+                          sigma_v_h, sigma_v_h, sigma_v_v).finished());
+  // const double q_h = fgo_config_.rov_cv_continous_sigma * fgo_config_.rov_cv_continous_sigma;
+  // const double q_v = q_h * 0.1;  // Down axis: 10x tighter (ROV moves mostly horizontally)
+  // const double dt2 = dt_rov * dt_rov;
+  // const double dt3 = dt2  * dt_rov;
+  // const double dt4 = dt3  * dt_rov;
 
-  auto cv_noise = gtsam::noiseModel::Gaussian::Covariance(cov);
+  // gtsam::Matrix66 cov = gtsam::Matrix66::Zero();
+  // // Position-position block
+  // cov(0,0) = q_h * dt4 / 4.0;  cov(1,1) = q_h * dt4 / 4.0;  cov(2,2) = q_v * dt4 / 4.0;
+  // // Position-velocity cross terms
+  // cov(0,3) = q_h * dt3 / 2.0;  cov(3,0) = q_h * dt3 / 2.0;
+  // cov(1,4) = q_h * dt3 / 2.0;  cov(4,1) = q_h * dt3 / 2.0;
+  // cov(2,5) = q_v * dt3 / 2.0;  cov(5,2) = q_v * dt3 / 2.0;
+  // // Velocity-velocity block
+  // cov(3,3) = q_h * dt2;         cov(4,4) = q_h * dt2;         cov(5,5) = q_v * dt2;
+
+  // auto cv_noise = gtsam::noiseModel::Gaussian::Covariance(cov);
   graph_.add(std::make_shared<ConstantVelocityFactor>(
       r_prev, w_prev, r_curr, w_curr, dt_rov, cv_noise));
 
@@ -404,6 +445,7 @@ void FactorGraphTrackingNode::rovUpdateWithUsbl(
   RCLCPP_INFO(get_logger(),
               "Added ROV %d node (step %u) at t=%.2f, dt=%.3f s",
               rov_id, current_rov_step, rov_time, dt_rov);
+  return true;
 }
 
 // ============================================================
@@ -517,8 +559,16 @@ void FactorGraphTrackingNode::initializeGraphWithGNSS(
   gtsam::Vector3 priorVel(0.0, 0.0, 0.0);
   gtsam::imuBias::ConstantBias priorBias;
 
+  // auto pose_noise = gtsam::noiseModel::Diagonal::Sigmas(
+  //     (gtsam::Vector(6) << M_PI, M_PI, M_PI,
+  //      fgo_config_.prior_translation_sigma,
+  //      fgo_config_.prior_translation_sigma,
+  //      fgo_config_.prior_translation_sigma).finished());
   auto pose_noise = gtsam::noiseModel::Diagonal::Sigmas(
-      (gtsam::Vector(6) << M_PI, M_PI, M_PI,
+    (gtsam::Vector(6) << 
+       0.1,    // roll: 6 deg
+       0.1,    // pitch: 6 deg
+       0.5,    // yaw: 30 deg (consistent with 2-GNSS init uncertainty)
        fgo_config_.prior_translation_sigma,
        fgo_config_.prior_translation_sigma,
        fgo_config_.prior_translation_sigma).finished());
@@ -634,7 +684,7 @@ void FactorGraphTrackingNode::publishROVState(const gtsam::Values &est) {
       gtsam::Key wKey = getRovKey('W', rov_id, current_rov_step);
 
       if (!est.exists(rKey) || !est.exists(wKey)) {
-        return;
+        continue;
       }
 
       auto rov_pos = est.at<gtsam::Point3>(rKey);
