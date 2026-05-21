@@ -34,11 +34,11 @@ source /opt/ros/humble/setup.bash
 source install/setup.bash
 
 python3 src/microamp_fgo_rov_tracking/post_processing/run_all_scenarios.py \
-  --dataset-dir src/microamp_fgo_rov_tracking/post_processing/simulation_data/circular_no_delay_no_loss \
+  --dataset-dir src/microamp_fgo_rov_tracking/post_processing/simulation_data/circular_delay_loss_tdma \
   --output-root src/microamp_fgo_rov_tracking/post_processing/batch_runs \
-  --run-name circular_nd_nl_CHOL_relin5_CV_0_02_prior_gnss_noise_fixed \
+  --run-name d2105_t1640_circular_d_l_CHOL_relin5_CV_0_02_cv_fac_tdma_rovPriorVelSigma_0_1 \
   --startup-delay 2.0 \
-  --fgo-params use_rov_depth_prior=false rov_cv_continous_sigma=0.02
+  --fgo-params use_rov_depth_prior=false rov_cv_continous_sigma=0.02 rov_prior_vel_sigma=0.1 \
  """
 
 SCENARIOS = {
@@ -49,7 +49,7 @@ SCENARIOS = {
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PACKAGE_ROOT = SCRIPT_DIR.parent
-DEFAULT_DATASET = PACKAGE_ROOT / "post_processing" / "simulation_data" / "circular_no_delay_no_loss"
+DEFAULT_DATASET = PACKAGE_ROOT / "post_processing" / "simulation_data" / "sinusoidal_no_delay_no_loss"
 DEFAULT_OUTPUT_ROOT = PACKAGE_ROOT / "post_processing" / "batch_runs"
 
 
