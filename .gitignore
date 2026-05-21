@@ -9,3 +9,4 @@
 /post_processing/estimated_data/scenario3
 /post_processing/batch_runs
 /post_processing/__pycache__
+post_processing/debugging/test/*

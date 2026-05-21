@@ -60,7 +60,7 @@ struct FgoConfig {
 
   // ROV priors
   double rov_prior_pos_sigma{2.0};
-  double rov_prior_vel_sigma{0.5};       // widened from 0.1 — ROV may be moving at init
+  double rov_prior_vel_sigma{0.1};       // widened from 0.1 — ROV may be moving at init
 
   // USBL / range / depth sensor noise
   double usbl_azimuth_sigma{0.01745};

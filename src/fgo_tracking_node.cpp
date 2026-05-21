@@ -31,7 +31,7 @@ static gtsam::ISAM2Params make_isam2_params() {
 
   p.factorization          = gtsam::ISAM2Params::CHOLESKY; 
   p.relinearizeThreshold   = 0.01;
-  p.relinearizeSkip        = 1;
+  p.relinearizeSkip        = 5;
   p.enableRelinearization  = true;
   p.evaluateNonlinearError = false;
   p.cacheLinearizedFactors = true;
@@ -233,6 +233,12 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
       gtsam::Point3(ned_coords.n, ned_coords.e, ned_coords.d),
       gps_leverarm, gps_noise));
 
+
+  // auto rp_noise = gtsam::noiseModel::Diagonal::Sigmas(
+  //   (gtsam::Vector(2) << 0.05, 0.05).finished());  // 50 mrad ≈ 3° roll/pitch sigma
+  // graph_.add(std::make_shared<RollPitchPriorFactor>(
+  //     X(curr_asv_index), rp_noise));
+
   // 5. Process queued USBL measurements.
   //
   //    The step counter is incremented immediately inside the loop so that
@@ -380,6 +386,7 @@ bool FactorGraphTrackingNode::rovUpdateWithUsbl(
   values_.insert(r_curr, (r_pred + w_pred * dt_rov).eval());
   values_.insert(w_curr, w_pred.eval());
 
+      // Constant velocity factor between previous and current ROV node
   const double sigma_a = fgo_config_.rov_cv_continous_sigma;  // m/s²
   const double sigma_p_h = sigma_a * dt_rov * dt_rov / 2.0;   // horizontal pos
   const double sigma_p_v = sigma_a * dt_rov * dt_rov / 2.0 * std::sqrt(0.1);
@@ -389,27 +396,30 @@ bool FactorGraphTrackingNode::rovUpdateWithUsbl(
   auto cv_noise = gtsam::noiseModel::Diagonal::Sigmas(
       (gtsam::Vector(6) << sigma_p_h, sigma_p_h, sigma_p_v,
                           sigma_v_h, sigma_v_h, sigma_v_v).finished());
-  // const double q_h = fgo_config_.rov_cv_continous_sigma * fgo_config_.rov_cv_continous_sigma;
-  // const double q_v = q_h * 0.1;  // Down axis: 10x tighter (ROV moves mostly horizontally)
-  // const double dt2 = dt_rov * dt_rov;
-  // const double dt3 = dt2  * dt_rov;
-  // const double dt4 = dt3  * dt_rov;
-
-  // gtsam::Matrix66 cov = gtsam::Matrix66::Zero();
-  // // Position-position block
-  // cov(0,0) = q_h * dt4 / 4.0;  cov(1,1) = q_h * dt4 / 4.0;  cov(2,2) = q_v * dt4 / 4.0;
-  // // Position-velocity cross terms
-  // cov(0,3) = q_h * dt3 / 2.0;  cov(3,0) = q_h * dt3 / 2.0;
-  // cov(1,4) = q_h * dt3 / 2.0;  cov(4,1) = q_h * dt3 / 2.0;
-  // cov(2,5) = q_v * dt3 / 2.0;  cov(5,2) = q_v * dt3 / 2.0;
-  // // Velocity-velocity block
-  // cov(3,3) = q_h * dt2;         cov(4,4) = q_h * dt2;         cov(5,5) = q_v * dt2;
-
-  // auto cv_noise = gtsam::noiseModel::Gaussian::Covariance(cov);
   graph_.add(std::make_shared<ConstantVelocityFactor>(
       r_prev, w_prev, r_curr, w_curr, dt_rov, cv_noise));
 
-  // USBL factor
+      // Alternative split CV factorisation (position integration + velocity random walk)
+  // const double sigma_a = fgo_config_.rov_cv_continous_sigma;       // m/s²
+  // // Position-integration noise (double-integrated accel noise)
+  // const double sigma_p_h = sigma_a * dt_rov * dt_rov / 2.0;
+  // const double sigma_p_v = sigma_p_h * std::sqrt(0.1);             // tighter down-axis
+  // // Velocity random-walk noise (single-integrated accel noise)
+  // const double sigma_v_h = sigma_a * dt_rov;
+  // const double sigma_v_v = sigma_v_h * std::sqrt(0.1);
+  
+  // auto pos_noise = gtsam::noiseModel::Diagonal::Sigmas(
+  //     (gtsam::Vector(3) << sigma_p_h, sigma_p_h, sigma_p_v).finished());
+  // auto vel_noise = gtsam::noiseModel::Diagonal::Sigmas(
+  //     (gtsam::Vector(3) << sigma_v_h, sigma_v_h, sigma_v_v).finished());
+  
+  // // Split CV: position integration + velocity random walk (decoupled, SPD-safe)
+  // graph_.add(std::make_shared<ConstantVelocityIntegrationFactor>(
+  //     r_prev, w_prev, r_curr, dt_rov, pos_noise));
+  // graph_.add(std::make_shared<VelocityRandomWalkFactor>(
+  //     w_prev, w_curr, vel_noise));
+
+// USBL factor
   auto body_P_sensor = getBodyToUsblPose(env_config_);
   auto usbl_noise = gtsam::noiseModel::Diagonal::Sigmas(
     (gtsam::Vector(2) << fgo_config_.usbl_azimuth_sigma,
@@ -574,6 +584,11 @@ void FactorGraphTrackingNode::initializeGraphWithGNSS(
        fgo_config_.prior_translation_sigma).finished());
 
   graph_.add(gtsam::PriorFactor<gtsam::Pose3>(X(0), priorPose, pose_noise));
+  
+  // auto rp_noise_init = gtsam::noiseModel::Diagonal::Sigmas(
+  //   (gtsam::Vector(2) << 0.05, 0.05).finished());
+  // graph_.add(std::make_shared<RollPitchPriorFactor>(X(0), rp_noise_init));
+
   graph_.add(gtsam::PriorFactor<gtsam::Vector3>(
       V(0), priorVel,
       gtsam::noiseModel::Isotropic::Sigma(3, fgo_config_.prior_vel_sigma)));

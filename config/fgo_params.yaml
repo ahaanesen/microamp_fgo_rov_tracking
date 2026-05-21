@@ -24,14 +24,14 @@ microamp_factor_graph_tracking:
       # ==================== ROV PARAMETERS ====================
       # ROV state priors (initial uncertainty when ROV first detected)
       rov_prior_pos_sigma: 2.0     # metres (init ROV pos uncert)
-      rov_prior_vel_sigma: 0.5     # m/s (init ROV vel uncert — widened from 0.1)
+      rov_prior_vel_sigma: 0.1     # m/s (init ROV vel uncert — widened from 0.1)
 
       # ROV CV process noise.
       # MUST match ESKF ModelCV sigma_a (tracking_and_navigation/tuning_sim.py).
       # Previously set to 0.02 (10x too small), making the FGO 75-100x stiffer
       # in position than the ESKF and unable to track ROV manoeuvres.
       # Q matrix uses the DWPA formulation (dt^4/4 position block) to match ESKF.
-      rov_cv_continous_sigma: 0.20  # m/s² — matches ESKF sigma_a=0.20
+      rov_cv_continous_sigma: 0.02  # m/s² — matches ESKF sigma_a=0.20
 
       # Kept for compatibility; rov_cv_continous_sigma is the active parameter.
       rov_process_vel_sigma: 0.20   # m/s²
