@@ -3,17 +3,17 @@ microamp_factor_graph_tracking:
     fgo:
       # ==================== BOAT IMU/GNSS PARAMETERS ====================
       # IMU noise (used in preintegration) — from ESKF ModelIMU
-      accel_noise: 0.001167    # m/s² white noise std (accm_std=1.167e-3)
-      gyro_noise: 0.0000436    # rad/s white noise std (gyro_std=4.36e-5)
-      accel_rw: 0.004          # m/s² random walk std (accm_bias_std=4e-3)
-      gyro_rw: 0.00005         # rad/s random walk std (gyro_bias_std=5e-5)
+      accel_noise: 4.363e-3    # white noise std (accm_std=1.167e-3)
+      gyro_noise: 1.1667e-3
+      accel_rw: 1e-16          # random walk std (accm_bias_std=4e-3)
+      gyro_rw: 1e-16         # random walk std (gyro_bias_std=5e-5)
       
       # Prior uncertainties (initial graph setup) — from ESKF initial state
       prior_translation_sigma: 0.1 # metres (init ASV pos uncert)
       prior_rotation_sigma: 5    # radians (init ASV orientation uncert)
       prior_vel_sigma: 0.1     # m/s (init ASV vel uncert)
-      prior_bias_sigma: 0.001  # IMU gyro bias prior
-      prior_accel_bias_sigma: 0.01  # IMU accel bias prior
+      prior_gyro_bias_sigma: 2.4e-6  # IMU gyro bias prior
+      prior_accel_bias_sigma: 4.9e-4  # IMU accel bias prior
       
       # GPS measurement noise — from ESKF SensorGNSS_ASV
       gps_sigma_ne: 0.3        # horizontal GPS sigma (metres)
@@ -25,6 +25,8 @@ microamp_factor_graph_tracking:
       # ROV state priors (initial uncertainty when ROV first detected)
       rov_prior_pos_sigma: 2.0     # metres (init ROV pos uncert)
       rov_prior_vel_sigma: 0.1     # m/s (init ROV vel uncert — widened from 0.1)
+
+      rov_initial_range_guess: 10.0   # initial guess on range from ASV to ROV [m]
 
       # ROV CV process noise.
       # MUST match ESKF ModelCV sigma_a (tracking_and_navigation/tuning_sim.py).
@@ -50,6 +52,6 @@ microamp_factor_graph_tracking:
       # ==================== BEARING-ONLY STABILISATION ====================
       # Soft depth prior — NOT a real measurement, just a weak constraint to
       # prevent the vertical axis from drifting in bearing-only mode.
-      use_rov_depth_prior: true
-      rov_depth_prior_mean: 10.0    # nominal Down [m]
-      rov_depth_prior_sigma: 10.0   # very weak [m]
+      # use_rov_depth_prior: false
+      # rov_depth_prior_mean: 10.0    # nominal Down [m]
+      # rov_depth_prior_sigma: 10.0   # very weak [m]

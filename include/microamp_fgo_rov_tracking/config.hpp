@@ -41,8 +41,8 @@ struct FgoConfig {
   double prior_translation_sigma{1.0};
   double prior_rotation_sigma{0.087};
   double prior_vel_sigma{0.1};
-  double prior_bias_sigma{0.001};
-  double prior_accel_bias_sigma{0.01};
+  double prior_gyro_bias_sigma{1e-16};
+  double prior_accel_bias_sigma{1e-16};
 
   // GPS measurement noise
   double gps_sigma_ne{0.3};
@@ -56,11 +56,13 @@ struct FgoConfig {
   //                                 Q_pv = sigma^2 * dt^3/2,
   //                                 Q_vv = sigma^2 * dt^2.
   double rov_cv_continous_sigma{0.020};   // m/s²
-  double rov_process_vel_sigma{0.20};    // not really used
+  double rov_process_vel_sigma{0.20};    // not used todo: remove
+
+  double rov_initial_range_guess{10.0};   // initial guess on range from ASV to ROV [m]
 
   // ROV priors
   double rov_prior_pos_sigma{2.0};
-  double rov_prior_vel_sigma{0.1};       // widened from 0.1 — ROV may be moving at init
+  double rov_prior_vel_sigma{0.1};     
 
   // USBL / range / depth sensor noise
   double usbl_azimuth_sigma{0.01745};
@@ -68,10 +70,10 @@ struct FgoConfig {
   double acoustic_range_sigma{0.5};
   double rov_depth_sigma{0.3};
 
-  // Bearing-only: weak depth stabilising prior
-  bool   use_rov_depth_prior{false};
-  double rov_depth_prior_mean{10.0};
-  double rov_depth_prior_sigma{10.0};
+  // // Bearing-only: weak depth stabilising prior
+  // bool   use_rov_depth_prior{false};
+  // double rov_depth_prior_mean{10.0};
+  // double rov_depth_prior_sigma{10.0};
 };
 
 

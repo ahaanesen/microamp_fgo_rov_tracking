@@ -76,8 +76,8 @@ private:
   void publishROVState(const gtsam::Values &est);
 
   gtsam::Key getRovKey(unsigned char prefix, uint32_t rov_id, uint32_t step_count);
-  gtsam::Key getAsvKeyForRovAssociation(double current_asv_time, uint64_t current_asv_index, double rov_time);
-  bool rovUpdateWithUsbl(uint8_t rov_id, double rov_time, gtsam::Key associated_asv_key, const USBLMessage::SharedPtr& usbl_msg);
+  gtsam::Key getAsvKeyForRovAssociation(rclcpp::Time current_asv_time, uint64_t current_asv_index, rclcpp::Time rov_time);
+  bool rovUpdateWithUsbl(uint8_t rov_id, rclcpp::Time rov_time, gtsam::Key associated_asv_key, const USBLMessage::SharedPtr& usbl_msg);
 
   // ==================== GTSAM CORE ====================
   gtsam::Values updateAndGetEstimate();
@@ -88,13 +88,13 @@ private:
   bool graph_initialised_;
   std::tuple<double, double> ne_init_; // Initial N and E for heading initialization TODO: add velocity as well
   
-  std::map<double, gtsam::Key> asv_timeline_; // Maps timestamp (seconds) to the GTSAM Key for the ASV
+  std::map<rclcpp::Time, gtsam::Key> asv_timeline_; // Maps timestamp (seconds) to the GTSAM Key for the ASV
   uint64_t asv_index_; // Counter for the ASV symbol index
-  double last_asv_timestamp_ = -1.0; // The timestamp of the very last ASV node added to the graph
+  rclcpp::Time last_asv_timestamp_; // The timestamp of the very last ASV node added to the graph
 
   std::map<uint8_t, bool> rov_initialised_; // Maps ROV ID to its initialization status
   std::map<uint8_t, uint32_t> rov_step_counters_; // Maps ROV ID to its current step counter
-  std::map<uint8_t, double> last_rov_timestamp_; // Maps ROV ID to the timestamp of its last update
+  std::map<uint8_t, rclcpp::Time> last_rov_timestamp_; // Maps ROV ID to the timestamp of its last update
 
   // ==================== ASV NAVIGATION ====================
   std::unique_ptr<gtsam::PreintegratedCombinedMeasurements> pim_;

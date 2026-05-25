@@ -17,7 +17,7 @@ struct NedConverter
     bool initialised = false;
 
     // WGS84 constants
-    static constexpr double a = 6378137.0;
+    static constexpr double r_e = 6378137.0;
     static constexpr double f = 1.0 / 298.257223563;
     static constexpr double e2 = f * (2 - f);
 
@@ -32,7 +32,7 @@ struct NedConverter
         cos_lon0 = std::cos(lon0_rad);
 
         // Precompute datum ECEF
-        double N0 = a / std::sqrt(1.0 - e2 * sin_lat0 * sin_lat0);
+        double N0 = r_e / std::sqrt(1.0 - e2 * sin_lat0 * sin_lat0);
         x0 = (N0 + h_m) * cos_lat0 * cos_lon0;
         y0 = (N0 + h_m) * cos_lat0 * sin_lon0;
         z0 = (N0 * (1 - e2) + h_m) * sin_lat0;
@@ -51,7 +51,7 @@ struct NedConverter
         double sin_lon = std::sin(lon);
         double cos_lon = std::cos(lon);
 
-        double N = a / std::sqrt(1 - e2 * sin_lat * sin_lat);
+        double N = r_e / std::sqrt(1 - e2 * sin_lat * sin_lat);
 
         double x = (N + h_m) * cos_lat * cos_lon;
         double y = (N + h_m) * cos_lat * sin_lon;

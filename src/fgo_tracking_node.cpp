@@ -21,10 +21,12 @@ gtsam::Pose3 getBodyToUsblPose(const EnvConfig& env_config) {
   return gtsam::Pose3(usbl_rotation, usbl_offset);
 }
 
+static rclcpp::Time timeFromSeconds(double seconds) {
+  return rclcpp::Time(static_cast<int64_t>(seconds * 1e9));
+}
+
 static gtsam::ISAM2Params make_isam2_params() {
   gtsam::ISAM2Params p;
-  // p.relinearizeThreshold = 0.01;  // default 0.1
-  // p.relinearizeSkip      = 1;      // default 10 — relinearize every update
   gtsam::ISAM2GaussNewtonParams gn;
   gn.wildfireThreshold = 1e-3;
   p.optimizationParams = gn;  // std::variant assignment in 4.3a
@@ -197,7 +199,7 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
   }
 
   // 2. Value initialization for new ASV node
-  double current_asv_time = rclcpp::Time(gnss_msg->header.stamp).seconds();
+  rclcpp::Time current_asv_time = gnss_msg->header.stamp;
   uint64_t prev_asv_index = asv_index_;
   uint64_t curr_asv_index = asv_index_ + 1;
 
@@ -248,7 +250,7 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
   while (!usbl_queue_.empty()) {
     const auto& usbl_msg = usbl_queue_.front();
     uint8_t rov_id   = usbl_msg->rov_id;
-    double  rov_time = static_cast<double>(usbl_msg->t_sent) / 1e6;
+    rclcpp::Time rov_time = timeFromSeconds(static_cast<double>(usbl_msg->t_sent) / 1e6);
     gtsam::Key associated_asv_key =
         getAsvKeyForRovAssociation(current_asv_time, curr_asv_index, rov_time);
 
@@ -297,7 +299,7 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
   bias_ = isam2_.calculateEstimate<gtsam::imuBias::ConstantBias>(B(curr_asv_index));
   pim_->resetIntegrationAndSetBias(bias_);
 
-  last_asv_timestamp_ = rclcpp::Time(gnss_msg->header.stamp).seconds();
+  last_asv_timestamp_ = gnss_msg->header.stamp;
   asv_index_ = curr_asv_index;
   asv_timeline_[last_asv_timestamp_] = X(curr_asv_index);
 
@@ -332,13 +334,13 @@ gtsam::Key FactorGraphTrackingNode::getRovKey(
 }
 
 gtsam::Key FactorGraphTrackingNode::getAsvKeyForRovAssociation(
-    double current_asv_time, uint64_t current_asv_index, double rov_time) {
+    rclcpp::Time current_asv_time, uint64_t current_asv_index, rclcpp::Time rov_time) {
   gtsam::Key closest_asv_key = X(current_asv_index);
-  double smallest_time_diff  = std::abs(current_asv_time - rov_time);
+  double smallest_time_diff  = std::abs((current_asv_time.seconds() - rov_time.seconds()));
 
   for (auto it = asv_timeline_.rbegin(); it != asv_timeline_.rend(); ++it) {
-    double asv_time  = it->first;
-    double time_diff = std::abs(asv_time - rov_time);
+    rclcpp::Time asv_time  = it->first;
+    double time_diff = std::abs((asv_time.seconds() - rov_time.seconds()));
     if (time_diff < smallest_time_diff) {
       smallest_time_diff = time_diff;
       closest_asv_key    = it->second;
@@ -351,11 +353,11 @@ gtsam::Key FactorGraphTrackingNode::getAsvKeyForRovAssociation(
 
 bool FactorGraphTrackingNode::rovUpdateWithUsbl(
     uint8_t rov_id,
-    double  rov_time,
+    rclcpp::Time rov_time,
     gtsam::Key associated_asv_key,
     const USBLMessage::SharedPtr& usbl_msg)
 {
-  double dt_rov = rov_time - last_rov_timestamp_[rov_id];
+  double dt_rov = (rov_time - last_rov_timestamp_[rov_id]).seconds();
   if (dt_rov <= 0.0) {
     RCLCPP_WARN(get_logger(),
                 "Non-positive dt for ROV %d: %.6f, skipping USBL measurement",
@@ -429,13 +431,13 @@ bool FactorGraphTrackingNode::rovUpdateWithUsbl(
       usbl_msg->azimuth, usbl_msg->elevation,
       body_P_sensor, usbl_noise));
 
-  // Optional soft depth prior (bearing-only stabilisation)
-  if (fgo_config_.use_rov_depth_prior) {
-    auto depth_prior_noise = gtsam::noiseModel::Isotropic::Sigma(
-        1, fgo_config_.rov_depth_prior_sigma);
-    graph_.add(std::make_shared<DepthFactor>(
-        r_curr, fgo_config_.rov_depth_prior_mean, depth_prior_noise));
-  }
+  // // Optional soft depth prior (bearing-only stabilisation)
+  // if (fgo_config_.use_rov_depth_prior) {
+  //   auto depth_prior_noise = gtsam::noiseModel::Isotropic::Sigma(
+  //       1, fgo_config_.rov_depth_prior_sigma);
+  //   graph_.add(std::make_shared<DepthFactor>(
+  //       r_curr, fgo_config_.rov_depth_prior_mean, depth_prior_noise));
+  // }
 
   if (scenario_id_ >= bearing_range) {
     auto tof = (usbl_msg->t_received - usbl_msg->t_sent) / 1e6;
@@ -540,7 +542,7 @@ void FactorGraphTrackingNode::initializeNewRov(
   }
 
   rov_step_counters_[rov_id]   = 0;
-  last_rov_timestamp_[rov_id]  = t_sent;
+  last_rov_timestamp_[rov_id]  = timeFromSeconds(t_sent);
 
   RCLCPP_INFO(get_logger(),
               "Initialized ROV %d at NED (%.2f, %.2f, %.2f), t_sent=%.2f",
@@ -596,9 +598,9 @@ void FactorGraphTrackingNode::initializeGraphWithGNSS(
     (gtsam::Vector(6) << fgo_config_.prior_accel_bias_sigma,
                          fgo_config_.prior_accel_bias_sigma,
                          fgo_config_.prior_accel_bias_sigma,
-                         fgo_config_.prior_bias_sigma,
-                         fgo_config_.prior_bias_sigma,
-                         fgo_config_.prior_bias_sigma).finished());
+                         fgo_config_.prior_gyro_bias_sigma,
+                         fgo_config_.prior_gyro_bias_sigma,
+                         fgo_config_.prior_gyro_bias_sigma).finished());
   graph_.add(gtsam::PriorFactor<gtsam::imuBias::ConstantBias>(
       B(0), priorBias, bias_noise));
 
@@ -623,7 +625,7 @@ void FactorGraphTrackingNode::initializeGraphWithGNSS(
   graph_.resize(0);
   values_.clear();
 
-  last_asv_timestamp_ = rclcpp::Time(gnss_msg->header.stamp).seconds();
+  last_asv_timestamp_ = gnss_msg->header.stamp;
   asv_index_          = 0;
   asv_timeline_[last_asv_timestamp_] = X(0);
 
@@ -658,7 +660,7 @@ void FactorGraphTrackingNode::publishBoatOdometry(const gtsam::Values &est) {
   gtsam::Quaternion q = pose.rotation().toQuaternion();
 
   Odometry odom;
-  odom.header.stamp    = rclcpp::Time(last_asv_timestamp_);
+  odom.header.stamp    = last_asv_timestamp_;
   odom.header.frame_id = "ned";
   odom.child_frame_id  = "base_link";
 
@@ -707,7 +709,7 @@ void FactorGraphTrackingNode::publishROVState(const gtsam::Values &est) {
       gtsam::Matrix rov_pos_cov = isam2_.marginalCovariance(rKey);
 
       ROVState rs;
-      rs.header.stamp = rclcpp::Time(last_rov_timestamp_[rov_id]);
+      rs.header.stamp = last_rov_timestamp_[rov_id];
       rs.rov_id       = rov_id;
 
       rs.position.x = rov_pos.x();
