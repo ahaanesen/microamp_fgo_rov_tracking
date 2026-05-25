@@ -498,17 +498,31 @@ void FactorGraphTrackingNode::initializeNewRov(
 
   double az_rad = (usbl_msg->azimuth)   * M_PI / 180.0;
   double el_rad = (usbl_msg->elevation) * M_PI / 180.0;
-  double tof    = t_receive - t_sent;
-  double r      = tof * env_config_.sound_speed;
+  // double tof    = t_receive - t_sent;
+  // double r      = tof * env_config_.sound_speed;
 
   gtsam::Pose3  body_P_sensor  = getBodyToUsblPose(env_config_);
   gtsam::Pose3  world_T_sensor = world_T_asv.compose(body_P_sensor);
   gtsam::Point3 sensor_pos     = world_T_sensor.translation();
 
-  gtsam::Point3 p_world(
+  double r = fgo_config_.rov_initial_range_guess;  // Use fixed initial range guess instead of time-of-flight
+  gtsam::Point3 p_world = gtsam::Point3(
       sensor_pos.x() + r * std::cos(el_rad) * std::cos(az_rad),
       sensor_pos.y() + r * std::cos(el_rad) * std::sin(az_rad),
-      usbl_msg->position.z);
+      sensor_pos.z() + r * std::sin(el_rad));
+
+  if (scenario_id_ >= bearing_range) {
+    r = (t_receive - t_sent) * env_config_.sound_speed;
+    // Use actual range from time-of-flight, but still ignore depth measurement (if any) for initial guess
+    p_world = gtsam::Point3(
+        sensor_pos.x() + r * std::cos(el_rad) * std::cos(az_rad),
+        sensor_pos.y() + r * std::cos(el_rad) * std::sin(az_rad),
+        sensor_pos.z() + r * std::sin(el_rad));
+    if (scenario_id_ >= bearing_range_depth) {
+      // If depth measurement is available, use it to refine the initial guess
+      p_world.z() = usbl_msg->position.z;
+    }
+  } 
 
   gtsam::Key rKey = getRovKey('R', rov_id, 0);
   gtsam::Key wKey = getRovKey('W', rov_id, 0);
@@ -529,6 +543,7 @@ void FactorGraphTrackingNode::initializeNewRov(
       body_P_sensor, usbl_noise));
 
   if (scenario_id_ >= bearing_range) {
+    double tof    = t_receive - t_sent;
     auto acoustic_noise = gtsam::noiseModel::Isotropic::Sigma(
         1, fgo_config_.acoustic_range_sigma / env_config_.sound_speed);
     graph_.add(std::make_shared<PsudoRangeFactor>(
