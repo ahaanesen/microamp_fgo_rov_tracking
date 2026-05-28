@@ -70,8 +70,8 @@ FactorGraphTrackingNode::FactorGraphTrackingNode()
   pim_params_->accelerometerCovariance = fgo_config_.accel_noise * fgo_config_.accel_noise * gtsam::I_3x3;
   pim_params_->gyroscopeCovariance = fgo_config_.gyro_noise * fgo_config_.gyro_noise * gtsam::I_3x3;
   pim_params_->integrationCovariance = 1e-8 * gtsam::I_3x3;
-  pim_params_->biasAccCovariance = fgo_config_.accel_rw * fgo_config_.accel_rw * gtsam::I_3x3;
-  pim_params_->biasOmegaCovariance = fgo_config_.gyro_rw * fgo_config_.gyro_rw * gtsam::I_3x3;
+  pim_params_->biasAccCovariance = fgo_config_.accel_bias * fgo_config_.accel_bias * gtsam::I_3x3;
+  pim_params_->biasOmegaCovariance = fgo_config_.gyro_bias * fgo_config_.gyro_bias * gtsam::I_3x3;
   pim_params_->biasAccOmegaInt = 1e-3 * gtsam::I_6x6;
 
   bias_ = gtsam::imuBias::ConstantBias();
@@ -486,6 +486,17 @@ void FactorGraphTrackingNode::initializeNewRov(
     const USBLMessage::SharedPtr& usbl_msg)
 {
   uint8_t rov_id    = usbl_msg->rov_id;
+  if (fgo_config_.rov_use_gt) {
+    gtsam::Point3 gt_pos(usbl_msg->position.x, usbl_msg->position.y, usbl_msg->position.z);
+    gtsam::Point3 gt_vel(0.0, 0.225, 0.072);
+    values_.insert(getRovKey('R', rov_id, 0), gt_pos);
+    values_.insert(getRovKey('W', rov_id, 0), gt_vel);
+    RCLCPP_INFO(get_logger(),
+                "Initialized ROV %d with GT at NED (%.2f, %.2f, %.2f)",
+                rov_id, gt_pos.x(), gt_pos.y(), gt_pos.z());
+    return;
+  }
+
   double  t_sent    = static_cast<double>(usbl_msg->t_sent)    / 1e6;
   double  t_receive = static_cast<double>(usbl_msg->t_received) / 1e6;
 
@@ -498,17 +509,31 @@ void FactorGraphTrackingNode::initializeNewRov(
 
   double az_rad = (usbl_msg->azimuth)   * M_PI / 180.0;
   double el_rad = (usbl_msg->elevation) * M_PI / 180.0;
-  double tof    = t_receive - t_sent;
-  double r      = tof * env_config_.sound_speed;
+  // double tof    = t_receive - t_sent;
+  // double r      = tof * env_config_.sound_speed;
 
   gtsam::Pose3  body_P_sensor  = getBodyToUsblPose(env_config_);
   gtsam::Pose3  world_T_sensor = world_T_asv.compose(body_P_sensor);
   gtsam::Point3 sensor_pos     = world_T_sensor.translation();
 
-  gtsam::Point3 p_world(
+  double r = fgo_config_.rov_initial_range_guess;  // Use fixed initial range guess instead of time-of-flight
+  gtsam::Point3 p_world = gtsam::Point3(
       sensor_pos.x() + r * std::cos(el_rad) * std::cos(az_rad),
       sensor_pos.y() + r * std::cos(el_rad) * std::sin(az_rad),
-      usbl_msg->position.z);
+      sensor_pos.z() + r * std::sin(el_rad));
+
+  if (scenario_id_ >= bearing_range) {
+    r = (t_receive - t_sent) * env_config_.sound_speed;
+    // Use actual range from time-of-flight, but still ignore depth measurement (if any) for initial guess
+    p_world = gtsam::Point3(
+        sensor_pos.x() + r * std::cos(el_rad) * std::cos(az_rad),
+        sensor_pos.y() + r * std::cos(el_rad) * std::sin(az_rad),
+        sensor_pos.z() + r * std::sin(el_rad));
+    if (scenario_id_ >= bearing_range_depth) {
+      // If depth measurement is available, use it to refine the initial guess
+      p_world.z() = usbl_msg->position.z;
+    }
+  } 
 
   gtsam::Key rKey = getRovKey('R', rov_id, 0);
   gtsam::Key wKey = getRovKey('W', rov_id, 0);
@@ -529,6 +554,7 @@ void FactorGraphTrackingNode::initializeNewRov(
       body_P_sensor, usbl_noise));
 
   if (scenario_id_ >= bearing_range) {
+    double tof    = t_receive - t_sent;
     auto acoustic_noise = gtsam::noiseModel::Isotropic::Sigma(
         1, fgo_config_.acoustic_range_sigma / env_config_.sound_speed);
     graph_.add(std::make_shared<PsudoRangeFactor>(

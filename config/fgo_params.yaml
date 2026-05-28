@@ -5,38 +5,36 @@ microamp_factor_graph_tracking:
       # IMU noise (used in preintegration) — from ESKF ModelIMU
       accel_noise: 4.363e-3    # white noise std (accm_std=1.167e-3)
       gyro_noise: 1.1667e-3
-      accel_rw: 1e-16          # random walk std (accm_bias_std=4e-3)
-      gyro_rw: 1e-16         # random walk std (gyro_bias_std=5e-5)
+      accel_bias: 4.9e-4         # random walk std (accm_bias_std=4e-3)
+      gyro_bias: 2.4e-6         # random walk std (gyro_bias_std=5e-5)
       
-      # Prior uncertainties (initial graph setup) — from ESKF initial state
-      prior_translation_sigma: 0.1 # metres (init ASV pos uncert)
+      # Prior uncertainties on ASV state when estimated from GPS or ground truth.
+      prior_translation_sigma: 1 # metres (init ASV pos uncert)
       prior_rotation_sigma: 5    # radians (init ASV orientation uncert)
       prior_vel_sigma: 0.1     # m/s (init ASV vel uncert)
-      prior_gyro_bias_sigma: 2.4e-6  # IMU gyro bias prior
-      prior_accel_bias_sigma: 4.9e-4  # IMU accel bias prior
-      
+
+      prior_accel_bias_sigma: 0.01  # IMU accel bias prior
+      prior_gyro_bias_sigma: 0.001  # IMU gyro bias prior 
+
+
       # GPS measurement noise — from ESKF SensorGNSS_ASV
-      gps_sigma_ne: 0.3        # horizontal GPS sigma (metres)
-      gps_sigma_d: 0.5         # depth GPS sigma (metres)
+      gps_sigma_ne: 1.5        # horizontal GPS sigma (metres)
+      gps_sigma_d: 2         # depth GPS sigma (metres)
       gps_sigma_floor: 0.3     # minimum GPS sigma (metres)
       gps_sigma_max: 50.0      # maximum GPS sigma (metres)
       
       # ==================== ROV PARAMETERS ====================
+      rov_use_gt: false  # whether to use ROV ground truth as a measurement (for benchmarking)
+      rov_pos_gt: [5.0, -5.0, 10.0]  # ROV ground truth position
+      rov_vel_gt: [0.0, 0.0, 0.0]    # ROV ground truth velocity
       # ROV state priors (initial uncertainty when ROV first detected)
       rov_prior_pos_sigma: 2.0     # metres (init ROV pos uncert)
       rov_prior_vel_sigma: 0.1     # m/s (init ROV vel uncert — widened from 0.1)
 
       rov_initial_range_guess: 10.0   # initial guess on range from ASV to ROV [m]
 
-      # ROV CV process noise.
-      # MUST match ESKF ModelCV sigma_a (tracking_and_navigation/tuning_sim.py).
-      # Previously set to 0.02 (10x too small), making the FGO 75-100x stiffer
-      # in position than the ESKF and unable to track ROV manoeuvres.
-      # Q matrix uses the DWPA formulation (dt^4/4 position block) to match ESKF.
+      # ROV CV process noise
       rov_cv_continous_sigma: 0.02  # m/s² — matches ESKF sigma_a=0.20
-
-      # Kept for compatibility; rov_cv_continous_sigma is the active parameter.
-      rov_process_vel_sigma: 0.20   # m/s²
       
       # ==================== USBL SENSOR PARAMETERS ====================
       # USBL bearing measurement noise — from ESKF SensorUSBL_Joint
@@ -44,14 +42,7 @@ microamp_factor_graph_tracking:
       usbl_elevation_sigma: 0.01745 # radians (~1 degree)
       
       # Acoustic range measurement noise — from ESKF SensorRange_Joint
-      acoustic_range_sigma: 0.5     # metres
+      acoustic_range_sigma: 0.3     # metres
       
       # ROV depth sensor noise — from ESKF SensorDepth_ROV
-      rov_depth_sigma: 0.3          # metres
-
-      # ==================== BEARING-ONLY STABILISATION ====================
-      # Soft depth prior — NOT a real measurement, just a weak constraint to
-      # prevent the vertical axis from drifting in bearing-only mode.
-      # use_rov_depth_prior: false
-      # rov_depth_prior_mean: 10.0    # nominal Down [m]
-      # rov_depth_prior_sigma: 10.0   # very weak [m]
+      rov_depth_sigma: 1.5          # metres
