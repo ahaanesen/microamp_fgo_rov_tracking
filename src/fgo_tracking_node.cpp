@@ -21,10 +21,6 @@ gtsam::Pose3 getBodyToUsblPose(const EnvConfig& env_config) {
   return gtsam::Pose3(usbl_rotation, usbl_offset);
 }
 
-static rclcpp::Time timeFromSeconds(double seconds) {
-  return rclcpp::Time(static_cast<int64_t>(seconds * 1e9));
-}
-
 static gtsam::ISAM2Params make_isam2_params() {
   gtsam::ISAM2Params p;
   gtsam::ISAM2GaussNewtonParams gn;
@@ -76,6 +72,10 @@ FactorGraphTrackingNode::FactorGraphTrackingNode()
 
   bias_ = gtsam::imuBias::ConstantBias();
   pim_ = std::make_unique<gtsam::PreintegratedCombinedMeasurements>(pim_params_, bias_);
+
+  // Graph is initialized lazily on the first GNSS message (see gnssCallback).
+  // When init_with_gt is true the same path runs but GT values replace the
+  // sensor-derived pose/velocity, keeping all timestamps from real messages.
 
   // ------------------------------------------------------------------
   // ROS I/O — BOAT
@@ -154,6 +154,11 @@ void FactorGraphTrackingNode::imuCallback(const Imu::SharedPtr msg) {
   }
 
   double dt = (stamp - last_imu_time_).seconds();
+  if (dt <= 0.0) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                         "Non-positive IMU dt: %.6f, skipping sample", dt);
+    return;
+  }
   last_imu_time_ = stamp;
 
   gtsam::Vector3 acc(msg->linear_acceleration.x, msg->linear_acceleration.y,
@@ -182,12 +187,10 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
     return;
   }
 
-  // if (!datum_initialised_) {
-  //   initializeDatumFromGNSS(*gnss_msg);
-  // }
-
+  // Graph initialization does not require IMU; move that check below.
   if (!graph_initialised_) {
-    if (ne_init_ == std::tuple<double, double>{0.0, 0.0}) {
+    // GT init: heading/position are known, so skip the two-GNSS heading step.
+    if (!fgo_config_.init_with_gt && ne_init_ == std::tuple<double, double>{0.0, 0.0}) {
       NedCoordinates ned_coords = ned_.gnssToNED(gnss_msg->lat, gnss_msg->lon, gnss_msg->height);
       ne_init_ = std::make_tuple(ned_coords.n, ned_coords.e);
       return;
@@ -195,6 +198,13 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
     initializeGraphWithGNSS(gnss_msg);
     graph_initialised_ = true;
     pim_->resetIntegrationAndSetBias(bias_);
+    return;
+  }
+
+  // Graph is initialized; require accumulated IMU data before processing updates.
+  if (!imu_initialised_ || pim_->deltaTij() <= 0.0) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                         "IMU not initialized yet, skipping GNSS update");
     return;
   }
 
@@ -222,12 +232,8 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
 
   // 4. Add GPS factor
   NedCoordinates ned_coords = ned_.gnssToNED(gnss_msg->lat, gnss_msg->lon, gnss_msg->height);
-  double sigma_ne = std::clamp(fgo_config_.gps_sigma_ne,
-                               fgo_config_.gps_sigma_floor, fgo_config_.gps_sigma_max);
-  double sigma_d  = std::clamp(fgo_config_.gps_sigma_d,
-                               fgo_config_.gps_sigma_floor, fgo_config_.gps_sigma_max);
   auto gps_noise = gtsam::noiseModel::Diagonal::Sigmas(
-    (gtsam::Vector(3) << sigma_ne, sigma_ne, sigma_d).finished());
+    (gtsam::Vector(3) << fgo_config_.gps_sigma_ne, fgo_config_.gps_sigma_ne, fgo_config_.gps_sigma_d).finished());
   auto gps_leverarm = gtsam::Point3(
       env_config_.gps_offset[0], env_config_.gps_offset[1], env_config_.gps_offset[2]);
   graph_.add(gtsam::GPSFactorArm(
@@ -250,7 +256,13 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
   while (!usbl_queue_.empty()) {
     const auto& usbl_msg = usbl_queue_.front();
     uint8_t rov_id   = usbl_msg->rov_id;
-    rclcpp::Time rov_time = timeFromSeconds(static_cast<double>(usbl_msg->t_sent) / 1e6);
+
+    double t_sent_sec = usbl_msg->t_sent * 1e-6;
+    rclcpp::Time rov_time(
+      static_cast<int64_t>((t_sent_sec + usbl_time_offset_) * 1e9),
+      this->get_clock()->get_clock_type());
+
+    // rclcpp::Time rov_time = timeFromSeconds(static_cast<double>(usbl_msg->t_sent) / 1e6);
     gtsam::Key associated_asv_key =
         getAsvKeyForRovAssociation(current_asv_time, curr_asv_index, rov_time);
 
@@ -260,31 +272,32 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
       // Advance to step 1 so the first rovUpdateWithUsbl call uses step 0 as r_prev.
       // Without this, current_rov_step would be 0 and r_prev would underflow to UINT32_MAX.
       rov_step_counters_[rov_id] += 1;
+      last_rov_timestamp_[rov_id] = rov_time;
+    } else if (last_rov_timestamp_.find(rov_id) == last_rov_timestamp_.end()) {
+      // ROV was GT-initialized: step 0 is already in the graph but we have no
+      // time reference yet. Use this first real USBL as the timing anchor and
+      // skip the update (no meaningful dt to compute against GT init time).
+      last_rov_timestamp_[rov_id] = rov_time;
     } else {
-      
       if (rovUpdateWithUsbl(rov_id, rov_time, associated_asv_key, usbl_msg)) {
         rov_step_counters_[rov_id] += 1;
         last_rov_timestamp_[rov_id] = rov_time;
       }
-      // rovUpdateWithUsbl(rov_id, rov_time, associated_asv_key, usbl_msg);
-      // // Increment immediately so the next iteration (if any) uses the correct key
-      // rov_step_counters_[rov_id] += 1;
-      // last_rov_timestamp_[rov_id] = rov_time;
     }
 
     usbl_queue_.pop_front();
   }
 
   // 6. Graph optimization (first pass)
-  RCLCPP_INFO(get_logger(), "Graph before update: %zu factors, %zu values",
-              graph_.size(), values_.size());
-  for (const auto& kv : values_) {
-    RCLCPP_INFO(get_logger(), "  key %lu  dim %zu",
-                kv.key, kv.value.dim());
-  }
-  if (graph_.size() > 0) {
-    graph_.print("Factors:\n");
-  }
+  // RCLCPP_INFO(get_logger(), "Graph before update: %zu factors, %zu values",
+  //             graph_.size(), values_.size());
+  // for (const auto& kv : values_) {
+  //   RCLCPP_INFO(get_logger(), "  key %lu  dim %zu",
+  //               kv.key, kv.value.dim());
+  // }
+  // if (graph_.size() > 0) {
+  //   graph_.print("Factors:\n");
+  // }
 
   isam2_.update(graph_, values_);
   graph_.resize(0);
@@ -310,7 +323,7 @@ void FactorGraphTrackingNode::gnssCallback(const GNSSNavPvt::SharedPtr gnss_msg)
 
   RCLCPP_INFO(get_logger(),
               "Processed GNSS at %.2f, NED (%.2f, %.2f, %.2f).",
-              current_asv_time, ned_coords.n, ned_coords.e, ned_coords.d);
+              current_asv_time.seconds(), ned_coords.n, ned_coords.e, ned_coords.d);
 }
 
 // ============================================================
@@ -357,6 +370,16 @@ bool FactorGraphTrackingNode::rovUpdateWithUsbl(
     gtsam::Key associated_asv_key,
     const USBLMessage::SharedPtr& usbl_msg)
 {
+  if (!usbl_time_offset_initialised_) {
+    double t_sent_sec = usbl_msg->t_sent * 1e-6;
+    double ros_time   = usbl_msg->header.stamp.sec;
+
+    usbl_time_offset_ = ros_time - t_sent_sec;
+    usbl_time_offset_initialised_ = true;
+
+    RCLCPP_INFO(get_logger(),
+        "USBL time offset initialized: %.6f", usbl_time_offset_);
+  }
   double dt_rov = (rov_time - last_rov_timestamp_[rov_id]).seconds();
   if (dt_rov <= 0.0) {
     RCLCPP_WARN(get_logger(),
@@ -401,25 +424,6 @@ bool FactorGraphTrackingNode::rovUpdateWithUsbl(
   graph_.add(std::make_shared<ConstantVelocityFactor>(
       r_prev, w_prev, r_curr, w_curr, dt_rov, cv_noise));
 
-      // Alternative split CV factorisation (position integration + velocity random walk)
-  // const double sigma_a = fgo_config_.rov_cv_continous_sigma;       // m/s²
-  // // Position-integration noise (double-integrated accel noise)
-  // const double sigma_p_h = sigma_a * dt_rov * dt_rov / 2.0;
-  // const double sigma_p_v = sigma_p_h * std::sqrt(0.1);             // tighter down-axis
-  // // Velocity random-walk noise (single-integrated accel noise)
-  // const double sigma_v_h = sigma_a * dt_rov;
-  // const double sigma_v_v = sigma_v_h * std::sqrt(0.1);
-  
-  // auto pos_noise = gtsam::noiseModel::Diagonal::Sigmas(
-  //     (gtsam::Vector(3) << sigma_p_h, sigma_p_h, sigma_p_v).finished());
-  // auto vel_noise = gtsam::noiseModel::Diagonal::Sigmas(
-  //     (gtsam::Vector(3) << sigma_v_h, sigma_v_h, sigma_v_v).finished());
-  
-  // // Split CV: position integration + velocity random walk (decoupled, SPD-safe)
-  // graph_.add(std::make_shared<ConstantVelocityIntegrationFactor>(
-  //     r_prev, w_prev, r_curr, dt_rov, pos_noise));
-  // graph_.add(std::make_shared<VelocityRandomWalkFactor>(
-  //     w_prev, w_curr, vel_noise));
 
 // USBL factor
   auto body_P_sensor = getBodyToUsblPose(env_config_);
@@ -455,8 +459,8 @@ bool FactorGraphTrackingNode::rovUpdateWithUsbl(
   }
 
   RCLCPP_INFO(get_logger(),
-              "Added ROV %d node (step %u) at t=%.2f, dt=%.3f s",
-              rov_id, current_rov_step, rov_time, dt_rov);
+              "Added ROV %i node (step %u) at t=%.2f, dt=%.3f s",
+              rov_id, current_rov_step, rov_time.seconds(), dt_rov);
   return true;
 }
 
@@ -467,6 +471,11 @@ bool FactorGraphTrackingNode::rovUpdateWithUsbl(
 void FactorGraphTrackingNode::usblCallback(const USBLMessage::SharedPtr msg) {
   if (!graph_initialised_) {
     RCLCPP_WARN(get_logger(), "Graph not initialized yet, skipping USBL measurement");
+    return;
+  }
+  if (!imu_initialised_) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                         "IMU not initialized yet, skipping USBL update");
     return;
   }
   usbl_queue_.push_back(msg);
@@ -486,16 +495,6 @@ void FactorGraphTrackingNode::initializeNewRov(
     const USBLMessage::SharedPtr& usbl_msg)
 {
   uint8_t rov_id    = usbl_msg->rov_id;
-  if (fgo_config_.rov_use_gt) {
-    gtsam::Point3 gt_pos(usbl_msg->position.x, usbl_msg->position.y, usbl_msg->position.z);
-    gtsam::Point3 gt_vel(0.0, 0.225, 0.072);
-    values_.insert(getRovKey('R', rov_id, 0), gt_pos);
-    values_.insert(getRovKey('W', rov_id, 0), gt_vel);
-    RCLCPP_INFO(get_logger(),
-                "Initialized ROV %d with GT at NED (%.2f, %.2f, %.2f)",
-                rov_id, gt_pos.x(), gt_pos.y(), gt_pos.z());
-    return;
-  }
 
   double  t_sent    = static_cast<double>(usbl_msg->t_sent)    / 1e6;
   double  t_receive = static_cast<double>(usbl_msg->t_received) / 1e6;
@@ -516,31 +515,37 @@ void FactorGraphTrackingNode::initializeNewRov(
   gtsam::Pose3  world_T_sensor = world_T_asv.compose(body_P_sensor);
   gtsam::Point3 sensor_pos     = world_T_sensor.translation();
 
-  double r = fgo_config_.rov_initial_range_guess;  // Use fixed initial range guess instead of time-of-flight
-  gtsam::Point3 p_world = gtsam::Point3(
-      sensor_pos.x() + r * std::cos(el_rad) * std::cos(az_rad),
-      sensor_pos.y() + r * std::cos(el_rad) * std::sin(az_rad),
-      sensor_pos.z() + r * std::sin(el_rad));
-
-  if (scenario_id_ >= bearing_range) {
-    r = (t_receive - t_sent) * env_config_.sound_speed;
-    // Use actual range from time-of-flight, but still ignore depth measurement (if any) for initial guess
+  gtsam::Point3 p_world;
+  if (fgo_config_.init_with_gt) {
+    p_world = gtsam::Point3(fgo_config_.rov_init_pos_gt[0],
+                            fgo_config_.rov_init_pos_gt[1],
+                            fgo_config_.rov_init_pos_gt[2]);
+  } else {
+    double r = fgo_config_.rov_initial_range_guess;
     p_world = gtsam::Point3(
         sensor_pos.x() + r * std::cos(el_rad) * std::cos(az_rad),
         sensor_pos.y() + r * std::cos(el_rad) * std::sin(az_rad),
         sensor_pos.z() + r * std::sin(el_rad));
-    if (scenario_id_ >= bearing_range_depth) {
-      // If depth measurement is available, use it to refine the initial guess
-      p_world.z() = usbl_msg->position.z;
+
+    if (scenario_id_ >= bearing_range) {
+      r = (t_receive - t_sent) * env_config_.sound_speed;
+      p_world = gtsam::Point3(
+          sensor_pos.x() + r * std::cos(el_rad) * std::cos(az_rad),
+          sensor_pos.y() + r * std::cos(el_rad) * std::sin(az_rad),
+          sensor_pos.z() + r * std::sin(el_rad));
+      if (scenario_id_ >= bearing_range_depth) {
+        p_world.z() = usbl_msg->position.z;
+      }
     }
-  } 
+  }
 
   gtsam::Key rKey = getRovKey('R', rov_id, 0);
   gtsam::Key wKey = getRovKey('W', rov_id, 0);
   values_.insert(rKey, p_world);
   values_.insert(wKey, gtsam::Vector3::Zero().eval());
 
-  auto prior_pos_noise = gtsam::noiseModel::Isotropic::Sigma(3, fgo_config_.rov_prior_pos_sigma);
+  const double pos_sigma = fgo_config_.init_with_gt ? 0.1 : fgo_config_.rov_prior_pos_sigma;
+  auto prior_pos_noise = gtsam::noiseModel::Isotropic::Sigma(3, pos_sigma);
   auto prior_vel_noise = gtsam::noiseModel::Isotropic::Sigma(3, fgo_config_.rov_prior_vel_sigma);
   graph_.add(gtsam::PriorFactor<gtsam::Point3>(rKey, p_world, prior_pos_noise));
   graph_.add(gtsam::PriorFactor<gtsam::Vector3>(wKey, gtsam::Vector3::Zero(), prior_vel_noise));
@@ -568,7 +573,9 @@ void FactorGraphTrackingNode::initializeNewRov(
   }
 
   rov_step_counters_[rov_id]   = 0;
-  last_rov_timestamp_[rov_id]  = timeFromSeconds(t_sent);
+  last_rov_timestamp_[rov_id] = rclcpp::Time(
+      static_cast<int64_t>(t_sent * 1e9),
+      this->get_clock()->get_clock_type());
 
   RCLCPP_INFO(get_logger(),
               "Initialized ROV %d at NED (%.2f, %.2f, %.2f), t_sent=%.2f",
@@ -582,44 +589,10 @@ void FactorGraphTrackingNode::initializeNewRov(
 void FactorGraphTrackingNode::initializeGraphWithGNSS(
     const GNSSNavPvt::SharedPtr gnss_msg)
 {
-  RCLCPP_INFO(get_logger(), "Initializing factor graph with first GNSS at time %.2f",
-              rclcpp::Time(gnss_msg->header.stamp).seconds());
-
-  NedCoordinates ned_coords =
-      ned_.gnssToNED(gnss_msg->lat, gnss_msg->lon, gnss_msg->height);
-
-  double delta_n    = ned_coords.n - std::get<0>(ne_init_);
-  double delta_e    = ned_coords.e - std::get<1>(ne_init_);
-  double initial_yaw = std::atan2(delta_e, delta_n);
-  gtsam::Rot3  initial_rot(gtsam::Rot3::Ypr(initial_yaw, 0.0, 0.0));
-  gtsam::Pose3 priorPose(initial_rot,
-                         gtsam::Point3(ned_coords.n, ned_coords.e, ned_coords.d));
+  gtsam::Pose3  priorPose;
   gtsam::Vector3 priorVel(0.0, 0.0, 0.0);
   gtsam::imuBias::ConstantBias priorBias;
 
-  // auto pose_noise = gtsam::noiseModel::Diagonal::Sigmas(
-  //     (gtsam::Vector(6) << M_PI, M_PI, M_PI,
-  //      fgo_config_.prior_translation_sigma,
-  //      fgo_config_.prior_translation_sigma,
-  //      fgo_config_.prior_translation_sigma).finished());
-  auto pose_noise = gtsam::noiseModel::Diagonal::Sigmas(
-    (gtsam::Vector(6) << 
-       0.1,    // roll: 6 deg
-       0.1,    // pitch: 6 deg
-       0.5,    // yaw: 30 deg (consistent with 2-GNSS init uncertainty)
-       fgo_config_.prior_translation_sigma,
-       fgo_config_.prior_translation_sigma,
-       fgo_config_.prior_translation_sigma).finished());
-
-  graph_.add(gtsam::PriorFactor<gtsam::Pose3>(X(0), priorPose, pose_noise));
-  
-  // auto rp_noise_init = gtsam::noiseModel::Diagonal::Sigmas(
-  //   (gtsam::Vector(2) << 0.05, 0.05).finished());
-  // graph_.add(std::make_shared<RollPitchPriorFactor>(X(0), rp_noise_init));
-
-  graph_.add(gtsam::PriorFactor<gtsam::Vector3>(
-      V(0), priorVel,
-      gtsam::noiseModel::Isotropic::Sigma(3, fgo_config_.prior_vel_sigma)));
   auto bias_noise = gtsam::noiseModel::Diagonal::Sigmas(
     (gtsam::Vector(6) << fgo_config_.prior_accel_bias_sigma,
                          fgo_config_.prior_accel_bias_sigma,
@@ -627,21 +600,64 @@ void FactorGraphTrackingNode::initializeGraphWithGNSS(
                          fgo_config_.prior_gyro_bias_sigma,
                          fgo_config_.prior_gyro_bias_sigma,
                          fgo_config_.prior_gyro_bias_sigma).finished());
-  graph_.add(gtsam::PriorFactor<gtsam::imuBias::ConstantBias>(
-      B(0), priorBias, bias_noise));
 
-  double sigma_ne = std::clamp(fgo_config_.gps_sigma_ne,
-                               fgo_config_.gps_sigma_floor, fgo_config_.gps_sigma_max);
-  double sigma_d  = std::clamp(fgo_config_.gps_sigma_d,
-                               fgo_config_.gps_sigma_floor, fgo_config_.gps_sigma_max);
-  auto gps_noise_init = gtsam::noiseModel::Diagonal::Sigmas(
-    (gtsam::Vector(3) << sigma_ne, sigma_ne, sigma_d).finished());
-  auto gps_leverarm = gtsam::Point3(
-      env_config_.gps_offset[0], env_config_.gps_offset[1], env_config_.gps_offset[2]);
-  graph_.add(gtsam::GPSFactorArm(
-      X(0),
-      gtsam::Point3(ned_coords.n, ned_coords.e, ned_coords.d),
-      gps_leverarm, gps_noise_init));
+  if (fgo_config_.init_with_gt) {
+    priorPose = gtsam::Pose3(
+        gtsam::Rot3::Ypr(fgo_config_.asv_init_yaw_gt, 0.0, 0.0),
+        gtsam::Point3(fgo_config_.asv_init_pos_gt[0],
+                      fgo_config_.asv_init_pos_gt[1],
+                      fgo_config_.asv_init_pos_gt[2]));
+    priorVel = gtsam::Vector3(fgo_config_.asv_init_vel_gt[0],
+                              fgo_config_.asv_init_vel_gt[1],
+                              fgo_config_.asv_init_vel_gt[2]);
+
+    auto pose_noise = gtsam::noiseModel::Diagonal::Sigmas(
+        (gtsam::Vector(6) << 0.01, 0.01, 0.01, 0.1, 0.1, 0.1).finished());
+    graph_.add(gtsam::PriorFactor<gtsam::Pose3>(X(0), priorPose, pose_noise));
+    graph_.add(gtsam::PriorFactor<gtsam::Vector3>(
+        V(0), priorVel, gtsam::noiseModel::Isotropic::Sigma(3, 0.1)));
+    graph_.add(gtsam::PriorFactor<gtsam::imuBias::ConstantBias>(
+        B(0), priorBias, bias_noise));
+
+    RCLCPP_INFO(get_logger(), "Graph initialized with GT at NED (%.2f, %.2f, %.2f), t=%.3f",
+                priorPose.translation().x(), priorPose.translation().y(),
+                priorPose.translation().z(),
+                rclcpp::Time(gnss_msg->header.stamp).seconds());
+  } else {
+    NedCoordinates ned_coords =
+        ned_.gnssToNED(gnss_msg->lat, gnss_msg->lon, gnss_msg->height);
+
+    double delta_n    = ned_coords.n - std::get<0>(ne_init_);
+    double delta_e    = ned_coords.e - std::get<1>(ne_init_);
+    double initial_yaw = std::atan2(delta_e, delta_n);
+    priorPose = gtsam::Pose3(gtsam::Rot3::Ypr(initial_yaw, 0.0, 0.0),
+                             gtsam::Point3(ned_coords.n, ned_coords.e, ned_coords.d));
+
+    auto pose_noise = gtsam::noiseModel::Diagonal::Sigmas(
+      (gtsam::Vector(6) <<
+         0.1, 0.1, 0.5,
+         fgo_config_.prior_translation_sigma,
+         fgo_config_.prior_translation_sigma,
+         fgo_config_.prior_translation_sigma).finished());
+    graph_.add(gtsam::PriorFactor<gtsam::Pose3>(X(0), priorPose, pose_noise));
+    graph_.add(gtsam::PriorFactor<gtsam::Vector3>(
+        V(0), priorVel,
+        gtsam::noiseModel::Isotropic::Sigma(3, fgo_config_.prior_vel_sigma)));
+    graph_.add(gtsam::PriorFactor<gtsam::imuBias::ConstantBias>(
+        B(0), priorBias, bias_noise));
+
+    auto gps_noise_init = gtsam::noiseModel::Diagonal::Sigmas(
+      (gtsam::Vector(3) << fgo_config_.gps_sigma_ne, fgo_config_.gps_sigma_ne,
+                           fgo_config_.gps_sigma_d).finished());
+    auto gps_leverarm = gtsam::Point3(
+        env_config_.gps_offset[0], env_config_.gps_offset[1], env_config_.gps_offset[2]);
+    graph_.add(gtsam::GPSFactorArm(
+        X(0), gtsam::Point3(ned_coords.n, ned_coords.e, ned_coords.d),
+        gps_leverarm, gps_noise_init));
+
+    RCLCPP_INFO(get_logger(), "Graph initialized with GNSS at NED (%.2f, %.2f, %.2f)",
+                ned_coords.n, ned_coords.e, ned_coords.d);
+  }
 
   values_.insert(X(0), priorPose);
   values_.insert(V(0), priorVel);
@@ -654,15 +670,12 @@ void FactorGraphTrackingNode::initializeGraphWithGNSS(
   last_asv_timestamp_ = gnss_msg->header.stamp;
   asv_index_          = 0;
   asv_timeline_[last_asv_timestamp_] = X(0);
-
-  RCLCPP_INFO(get_logger(),
-              "Graph initialized at NED (%.2f, %.2f, %.2f)",
-              ned_coords.n, ned_coords.e, ned_coords.d);
 }
 
 gtsam::Values FactorGraphTrackingNode::updateAndGetEstimate() {
   return isam2_.calculateEstimate();
 }
+
 
 // ============================================================
 // PUBLISH STATES

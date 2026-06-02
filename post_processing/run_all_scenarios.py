@@ -36,9 +36,28 @@ source install/setup.bash
 python3 src/microamp_fgo_rov_tracking/post_processing/run_all_scenarios.py \
   --dataset-dir src/microamp_fgo_rov_tracking/post_processing/simulation_data/circular_delay_loss_tdma \
   --output-root src/microamp_fgo_rov_tracking/post_processing/batch_runs \
-  --run-name d2105_t1640_circular_d_l_CHOL_relin5_CV_0_02_cv_fac_tdma_rovPriorVelSigma_0_1 \
+  --run-name d2905_t1003_circular_d_l_CHOL_relin5_CV_0_02_cv_fac_tdma_rovPriorVelSigma_0_1 \
   --startup-delay 2.0 \
-  --fgo-params use_rov_depth_prior=false rov_cv_continous_sigma=0.02 rov_prior_vel_sigma=0.1 \
+  --fgo-params rov_cv_continous_sigma=0.02 rov_prior_vel_sigma=0.2 init_with_gt=true \
+
+
+  Experiment 1: run this with different CV values
+ python3 src/microamp_fgo_rov_tracking/post_processing/run_all_scenarios.py \
+  --chosen-scenarios 1 \
+  --dataset-dir src/microamp_fgo_rov_tracking/post_processing/simulation_data/figure8_delay_no_loss_tdma_slot_5p0 \
+  --output-root src/microamp_fgo_rov_tracking/post_processing/batch_runs \
+  --run-name d2905_t1759_fig8_d_nl_CHOL_relin5_CV_0_02_newGtInit_2 \
+  --startup-delay 2.0 \
+  --fgo-params rov_cv_continous_sigma=0.02 init_with_gt=true
+
+Experiment 2: run with different range scale guesses (true range is sqrt(269)m~16.4m in this dataset)
+ python3 src/microamp_fgo_rov_tracking/post_processing/run_all_scenarios.py \
+  --chosen-scenarios 1 \
+  --dataset-dir src/microamp_fgo_rov_tracking/post_processing/simulation_data/fig8_delay_no_loss \
+  --output-root src/microamp_fgo_rov_tracking/post_processing/batch_runs \
+  --run-name d2905_t1604_fig8_d_nl_CHOL_relin5_CV_0_02_rangeGuess_16_4 \
+  --startup-delay 2.0 \
+  --fgo-params rov_cv_continous_sigma=0.02 init_with_gt=false rov_initial_range_guess=16.4
  """
 
 SCENARIOS = {
@@ -56,6 +75,14 @@ DEFAULT_OUTPUT_ROOT = PACKAGE_ROOT / "post_processing" / "batch_runs"
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Run FGO scenarios 1-3 on the same bag dataset and plot the results."
+    )
+    parser.add_argument(
+        "--chosen-scenarios",
+        nargs="+",
+        type=int,
+        default=[1, 2, 3],
+        choices=sorted(SCENARIOS.keys()),
+        help="List of scenario numbers to run (1-3).",
     )
     parser.add_argument(
         "--dataset-dir",
@@ -323,8 +350,12 @@ def main() -> int:
 
     run_root.mkdir(parents=True, exist_ok=True)
 
+    chosen_scenarios = set(args.chosen_scenarios)
+
     summary_rows = []
     for i, (scenario_id, scenario_name) in enumerate(SCENARIOS.items()):
+        if scenario_id not in chosen_scenarios:
+            continue
         if i > 0:
             time.sleep(5.0)  # Let DDS deregister dead nodes before starting the next scenario
         print(f"Running scenario {scenario_id}: {scenario_name}", flush=True)
@@ -345,13 +376,16 @@ def main() -> int:
 
     stats_frames = []
     consistency_frames = []
-    for scenario_id in SCENARIOS:
+    for scenario_id in sorted(chosen_scenarios):
         stat_path = run_root / f"scenario{scenario_id}" / "plots" / "fgo_statistics.csv"
-        stats_frames.append(pd.read_csv(stat_path))
+        if stat_path.exists():
+            stats_frames.append(pd.read_csv(stat_path))
         consistency_path = run_root / f"scenario{scenario_id}" / "plots" / "consistency_statistics.csv"
         if consistency_path.exists():
             consistency_frames.append(pd.read_csv(consistency_path))
-    pd.concat(stats_frames, ignore_index=True).to_csv(run_root / "all_statistics.csv", index=False)
+
+    if stats_frames:
+        pd.concat(stats_frames, ignore_index=True).to_csv(run_root / "all_statistics.csv", index=False)
     if consistency_frames:
         pd.concat(consistency_frames, ignore_index=True).to_csv(
             run_root / "all_consistency_statistics.csv",

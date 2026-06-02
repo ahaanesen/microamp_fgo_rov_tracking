@@ -128,6 +128,10 @@ private:
   // ==================== ROS PUBLISHERS ====================
   rclcpp::Publisher<Odometry>::SharedPtr state_pub_;
   rclcpp::Publisher<ROVState>::SharedPtr rov_state_pub_;
+
+  // Simulation only
+  bool usbl_time_offset_initialised_;
+  double usbl_time_offset_;
 };
 
 #endif // MICROAMP_FACTOR_GRAPH_TRACKING_NODE_HPP

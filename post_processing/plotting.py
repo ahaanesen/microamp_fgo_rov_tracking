@@ -256,6 +256,28 @@ def _error_statistics(gt_xyz, est_xyz):
     path_length_gt = _path_length(gt_xyz)
     path_length_est = _path_length(est_xyz)
 
+    nees_pos_vals, nees_vel_vals = [], []
+    # Estimate position covariance from residuals (sample covariance) and
+    # compute per-sample NEES = e.T @ P^{-1} @ e. Use pseudo-inverse if needed.
+    try:
+        if len(err) > 0:
+            # sample covariance (unbiased)
+            P = np.cov(err, rowvar=False, bias=False)
+            # ensure shape (3,3)
+            if P.shape == (3, 3) and np.all(np.isfinite(P)):
+                try:
+                    Pinv = np.linalg.inv(P)
+                except np.linalg.LinAlgError:
+                    Pinv = np.linalg.pinv(P)
+                for k in range(len(err)):
+                    e = err[k]
+                    try:
+                        nees_pos_vals.append(float(e @ Pinv @ e))
+                    except Exception:
+                        nees_pos_vals.append(np.nan)
+    except Exception:
+        nees_pos_vals = []
+
     if path_length_gt > 0:
         path_length_error_pct = 100.0 * abs(path_length_est - path_length_gt) / path_length_gt
     else:
@@ -269,15 +291,17 @@ def _error_statistics(gt_xyz, est_xyz):
         "max_error": float(np.max(pos_err)),
         "final_error": float(pos_err[-1]),
         "ate_rms": float(np.sqrt(np.mean(pos_err**2))),
-        "mean_abs_n": float(np.mean(np.abs(err[:, 0]))),
-        "mean_abs_e": float(np.mean(np.abs(err[:, 1]))),
-        "mean_abs_d": float(np.mean(np.abs(err[:, 2]))),
-        "std_n": float(np.std(err[:, 0])),
-        "std_e": float(np.std(err[:, 1])),
-        "std_d": float(np.std(err[:, 2])),
-        "path_length_gt": float(path_length_gt),
-        "path_length_est": float(path_length_est),
-        "path_length_error_pct": float(path_length_error_pct),
+        "mean_tanees_pos": float(np.nanmean(nees_pos_vals)) if len(nees_pos_vals) > 0 else np.nan,
+        "mean_tanees_vel": float(np.nanmean(nees_vel_vals)) if len(nees_vel_vals) > 0 else np.nan,
+        # "mean_abs_n": float(np.mean(np.abs(err[:, 0]))),
+        # "mean_abs_e": float(np.mean(np.abs(err[:, 1]))),
+        # "mean_abs_d": float(np.mean(np.abs(err[:, 2]))),
+        # "std_n": float(np.std(err[:, 0])),
+        # "std_e": float(np.std(err[:, 1])),
+        # "std_d": float(np.std(err[:, 2])),
+        # "path_length_gt": float(path_length_gt),
+        # "path_length_est": float(path_length_est),
+        # "path_length_error_pct": float(path_length_error_pct),
     }
 
 

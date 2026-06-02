@@ -47,19 +47,20 @@ struct FgoConfig {
   // GPS measurement noise
   double gps_sigma_ne{1.5};
   double gps_sigma_d{2.0};
-  double gps_sigma_floor{0.3};
-  double gps_sigma_max{50.0};
 
-  // ROV CV process noise.
-  bool rov_use_gt{false};  // whether to use ROV ground truth as a measurement
-  std::vector<double> rov_pos_gt{5, -5, 10}; 
+  bool init_with_gt{false}; //whether to initialise ASV state with ground truth (for benchmarking)
+  std::vector<double> asv_init_pos_gt{30.0,0.0,0.0};  // ASV ground truth position
+  std::vector<double> asv_init_vel_gt{1.5,2.0,0.0};  // ASV ground truth velocity (vx, vy, vz)
+  double asv_init_yaw_gt{0.9272950380015653};  // ASV ground truth yaw (radians)
+  std::vector<double> rov_init_pos_gt{35, 10, 12}; 
+  std::vector<double> rov_init_vel_gt{-3.3749999772680894e-05,0.22499999662501935,0.07199999930875833};
   double rov_cv_continous_sigma{0.020};   // m/s²
 
   double rov_initial_range_guess{10.0};   // initial guess on range from ASV to ROV [m]
 
   // ROV priors
   double rov_prior_pos_sigma{2.0};
-  double rov_prior_vel_sigma{0.1};     
+  double rov_prior_vel_sigma{0.2};     
 
   // USBL / range / depth sensor noise
   double usbl_azimuth_sigma{0.01745};

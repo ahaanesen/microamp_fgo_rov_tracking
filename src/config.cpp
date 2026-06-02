@@ -51,17 +51,25 @@ void declareAndLoadFgo(rclcpp::Node& node, FgoConfig& cfg) {
 #define LOAD_D(name) do { node.declare_parameter("fgo." #name, cfg.name); cfg.name = node.get_parameter("fgo." #name).as_double(); } while (0)
   LOAD_D(accel_noise); LOAD_D(gyro_noise); LOAD_D(accel_bias); LOAD_D(gyro_bias);
   LOAD_D(prior_translation_sigma); LOAD_D(prior_rotation_sigma); LOAD_D(prior_vel_sigma); LOAD_D(prior_gyro_bias_sigma); LOAD_D(prior_accel_bias_sigma);
-  LOAD_D(gps_sigma_ne); LOAD_D(gps_sigma_d); LOAD_D(gps_sigma_floor); LOAD_D(gps_sigma_max);
+  LOAD_D(gps_sigma_ne); LOAD_D(gps_sigma_d);
   LOAD_D(rov_cv_continous_sigma);
   LOAD_D(rov_initial_range_guess);
   LOAD_D(rov_prior_pos_sigma); LOAD_D(rov_prior_vel_sigma);
   LOAD_D(usbl_azimuth_sigma); LOAD_D(usbl_elevation_sigma);
   LOAD_D(acoustic_range_sigma); LOAD_D(rov_depth_sigma);
 
-  node.declare_parameter("fgo.rov_pos_gt", cfg.rov_pos_gt);
-  cfg.rov_pos_gt = node.get_parameter("fgo.rov_pos_gt").as_double_array();
-  node.declare_parameter("fgo.rov_use_gt", cfg.rov_use_gt);
-  cfg.rov_use_gt = node.get_parameter("fgo.rov_use_gt").as_bool();
+  node.declare_parameter("fgo.init_with_gt", cfg.init_with_gt);
+  cfg.init_with_gt = node.get_parameter("fgo.init_with_gt").as_bool();
+  node.declare_parameter("fgo.asv_init_pos_gt", cfg.asv_init_pos_gt);
+  cfg.asv_init_pos_gt = node.get_parameter("fgo.asv_init_pos_gt").as_double_array();
+  node.declare_parameter("fgo.asv_init_vel_gt", cfg.asv_init_vel_gt);
+  cfg.asv_init_vel_gt = node.get_parameter("fgo.asv_init_vel_gt").as_double_array();
+  node.declare_parameter("fgo.asv_init_yaw_gt", cfg.asv_init_yaw_gt);
+  cfg.asv_init_yaw_gt = node.get_parameter("fgo.asv_init_yaw_gt").as_double();
+  node.declare_parameter("fgo.rov_init_pos_gt", cfg.rov_init_pos_gt);
+  cfg.rov_init_pos_gt = node.get_parameter("fgo.rov_init_pos_gt").as_double_array();
+  node.declare_parameter("fgo.rov_init_vel_gt", cfg.rov_init_vel_gt);
+  cfg.rov_init_vel_gt = node.get_parameter("fgo.rov_init_vel_gt").as_double_array();
 
 #undef LOAD_D
 
