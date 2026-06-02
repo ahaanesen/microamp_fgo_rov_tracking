@@ -1,0 +1,8 @@
+estimator,experiment,scenario,platform,sigma_a,tdma_interval,init_range_scale,rmse,ate,final_error,mean_nees,converged
+FGO,exp1_noise_sweep,scenario1,UNKNOWN,0.005,5.0,GT init,,,,,False
+FGO,exp1_noise_sweep,scenario1,UNKNOWN,0.01,5.0,GT init,,,,,False
+FGO,exp1_noise_sweep,scenario1,UNKNOWN,0.02,5.0,GT init,,,,,False
+FGO,exp1_noise_sweep,scenario1,UNKNOWN,0.05,5.0,GT init,,,,,False
+FGO,exp1_noise_sweep,scenario1,UNKNOWN,0.1,5.0,GT init,,,,,False
+FGO,exp1_noise_sweep,scenario1,UNKNOWN,0.5,5.0,GT init,,,,,False
+FGO,exp1_noise_sweep,scenario1,UNKNOWN,1.0,5.0,GT init,,,,,False

@@ -10,3 +10,5 @@
 /post_processing/batch_runs
 /post_processing/__pycache__
 post_processing/debugging/test/*
+/post_processing/results/exp1_noise_sweep/*
+/post_processing/results/exp3_tdma_sweep/*

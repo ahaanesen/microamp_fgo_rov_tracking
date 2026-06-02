@@ -1,0 +1,28 @@
+{
+  "duration_sec": 300.0,
+  "dt_sec": 0.01,
+  "seed": 42,
+  "trajectory_type": "figure_8",
+  "rov_id": 1,
+  "epoch_sec": 1700000000,
+  "frame": "NED",
+  "datum": {
+    "lat_deg": 60.3913,
+    "lon_deg": 5.3221,
+    "h_m": 0.0
+  },
+  "measurement_timing": {
+    "acoustic_delay": true,
+    "acoustic_jitter_std_sec": 0.0,
+    "usbl_miss_prob": 0.0,
+    "range_miss_prob": 0.0,
+    "depth_miss_prob": 0.0,
+    "sound_speed_mps": 1500.0
+  },
+  "timestamp_alignment": {
+    "t_ros_sec_definition": "epoch_sec + t_sim_sec",
+    "t_ros_ns_definition": "int((epoch_sec + t_sim_sec) * 1e9)",
+    "stamp_split": "sec=int(t), nsec=int((t-sec)*1e9)"
+  },
+  "notes": "Ground-truth CSVs and MCAP bag were generated in one run from the same trajectories and seed."
+}
