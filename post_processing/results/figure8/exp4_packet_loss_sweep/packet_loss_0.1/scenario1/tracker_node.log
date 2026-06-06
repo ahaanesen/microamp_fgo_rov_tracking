@@ -1,0 +1,357 @@
+[INFO] [1780734304.444700555] [microamp_factor_graph_tracking]: Using scenario_id=1
+[INFO] [1780734304.456337888] [microamp_factor_graph_tracking]: Expanded factor graph node initialized.
+[WARN] [1780734306.897102167] [microamp_factor_graph_tracking]: Graph not initialized yet, skipping USBL measurement
+[INFO] [1780734306.898589209] [microamp_factor_graph_tracking]: Graph initialized with GNSS at NED (31.39, 2.39, -0.15)
+[INFO] [1780734306.901138917] [microamp_factor_graph_tracking]: IMU initialized at time 1700000001.010
+[INFO] [1780734306.997210334] [microamp_factor_graph_tracking]: Processed GNSS at 1700000002.00, NED (32.92, 4.58, -0.11).
+[INFO] [1780734307.097177709] [microamp_factor_graph_tracking]: Processed GNSS at 1700000003.00, NED (34.70, 5.66, -0.75).
+[INFO] [1780734307.197480459] [microamp_factor_graph_tracking]: Processed GNSS at 1700000004.00, NED (36.61, 8.18, 0.44).
+[INFO] [1780734307.296979417] [microamp_factor_graph_tracking]: Processed GNSS at 1700000005.00, NED (37.46, 9.83, -0.00).
+[INFO] [1780734307.397369251] [microamp_factor_graph_tracking]: Processed GNSS at 1700000006.00, NED (39.19, 11.65, 0.62).
+[INFO] [1780734307.497222667] [microamp_factor_graph_tracking]: Processed GNSS at 1700000007.00, NED (40.53, 13.64, 0.38).
+[INFO] [1780734307.597681209] [microamp_factor_graph_tracking]: Processed GNSS at 1700000008.00, NED (41.87, 14.35, 0.54).
+[INFO] [1780734307.697113959] [microamp_factor_graph_tracking]: Processed GNSS at 1700000009.00, NED (42.70, 16.55, 0.74).
+[INFO] [1780734307.798278251] [microamp_factor_graph_tracking]: Processed GNSS at 1700000010.00, NED (44.61, 17.59, -0.72).
+[INFO] [1780734307.896041167] [microamp_factor_graph_tracking]: Initialized ROV 1 at NED (34.12, 12.31, 13.64), t_sent=1700000010.00
+[INFO] [1780734307.898192792] [microamp_factor_graph_tracking]: Processed GNSS at 1700000011.00, NED (45.59, 18.19, 0.68).
+[INFO] [1780734307.999900168] [microamp_factor_graph_tracking]: Processed GNSS at 1700000012.00, NED (46.65, 18.88, -0.74).
+[INFO] [1780734308.097746126] [microamp_factor_graph_tracking]: Processed GNSS at 1700000013.00, NED (47.66, 19.62, 0.05).
+[INFO] [1780734308.197957168] [microamp_factor_graph_tracking]: Processed GNSS at 1700000014.00, NED (49.89, 20.20, 0.03).
+[INFO] [1780734308.296902168] [microamp_factor_graph_tracking]: Processed GNSS at 1700000015.00, NED (50.57, 20.11, 0.21).
+[INFO] [1780734308.395693376] [microamp_factor_graph_tracking]: USBL time offset initialized: -0.000040
+[INFO] [1780734308.395967001] [microamp_factor_graph_tracking]: Added ROV 1 node (step 1) at t=1700000015.00, dt=5.000 s
+[INFO] [1780734308.396833668] [microamp_factor_graph_tracking]: Processed GNSS at 1700000016.00, NED (51.76, 20.15, 0.24).
+[INFO] [1780734308.496159084] [microamp_factor_graph_tracking]: Processed GNSS at 1700000017.00, NED (53.22, 20.24, -0.09).
+[INFO] [1780734308.596587543] [microamp_factor_graph_tracking]: Processed GNSS at 1700000018.00, NED (54.39, 19.43, -0.16).
+[INFO] [1780734308.708257585] [microamp_factor_graph_tracking]: Processed GNSS at 1700000019.00, NED (55.10, 19.31, -0.48).
+[INFO] [1780734308.810767793] [microamp_factor_graph_tracking]: Processed GNSS at 1700000020.00, NED (55.63, 18.12, -0.11).
+[INFO] [1780734308.909928085] [microamp_factor_graph_tracking]: Processed GNSS at 1700000021.00, NED (56.42, 17.33, -0.95).
+[INFO] [1780734308.999732418] [microamp_factor_graph_tracking]: Processed GNSS at 1700000022.00, NED (57.19, 15.96, -0.61).
+[INFO] [1780734309.098981251] [microamp_factor_graph_tracking]: Processed GNSS at 1700000023.00, NED (57.48, 14.54, 0.12).
+[INFO] [1780734309.199603168] [microamp_factor_graph_tracking]: Processed GNSS at 1700000024.00, NED (58.28, 13.14, -0.39).
+[INFO] [1780734309.301090751] [microamp_factor_graph_tracking]: Processed GNSS at 1700000025.00, NED (58.60, 11.96, -0.28).
+[INFO] [1780734309.406057085] [microamp_factor_graph_tracking]: Processed GNSS at 1700000026.00, NED (59.06, 10.16, -0.48).
+[INFO] [1780734309.509427585] [microamp_factor_graph_tracking]: Processed GNSS at 1700000027.00, NED (59.65, 8.32, 0.03).
+[INFO] [1780734309.609036335] [microamp_factor_graph_tracking]: Processed GNSS at 1700000028.00, NED (59.56, 5.99, 0.08).
+[INFO] [1780734309.713086752] [microamp_factor_graph_tracking]: Processed GNSS at 1700000029.00, NED (59.89, 3.85, 0.62).
+[INFO] [1780734309.797470918] [microamp_factor_graph_tracking]: Processed GNSS at 1700000030.00, NED (60.55, 2.37, 0.31).
+[INFO] [1780734309.895644835] [microamp_factor_graph_tracking]: Added ROV 1 node (step 2) at t=1700000030.00, dt=14.999 s
+[INFO] [1780734309.896781960] [microamp_factor_graph_tracking]: Processed GNSS at 1700000031.00, NED (60.07, 0.13, 0.72).
+[INFO] [1780734309.996178543] [microamp_factor_graph_tracking]: Processed GNSS at 1700000032.00, NED (60.39, -1.21, 0.53).
+[INFO] [1780734310.098242627] [microamp_factor_graph_tracking]: Processed GNSS at 1700000033.00, NED (59.93, -4.38, 0.78).
+[INFO] [1780734310.209645710] [microamp_factor_graph_tracking]: Processed GNSS at 1700000034.00, NED (59.38, -5.58, -0.60).
+[INFO] [1780734310.300590169] [microamp_factor_graph_tracking]: Processed GNSS at 1700000035.00, NED (59.52, -6.93, 0.57).
+[INFO] [1780734310.395728919] [microamp_factor_graph_tracking]: Added ROV 1 node (step 3) at t=1700000035.00, dt=5.001 s
+[INFO] [1780734310.398226710] [microamp_factor_graph_tracking]: Processed GNSS at 1700000036.00, NED (59.19, -8.67, 0.14).
+[INFO] [1780734310.496743794] [microamp_factor_graph_tracking]: Processed GNSS at 1700000037.00, NED (59.17, -10.79, -0.50).
+[INFO] [1780734310.598440252] [microamp_factor_graph_tracking]: Processed GNSS at 1700000038.00, NED (58.71, -11.93, -0.26).
+[INFO] [1780734310.697417252] [microamp_factor_graph_tracking]: Processed GNSS at 1700000039.00, NED (58.12, -13.62, 0.62).
+[INFO] [1780734310.811866919] [microamp_factor_graph_tracking]: Processed GNSS at 1700000040.00, NED (57.37, -15.85, 0.12).
+[INFO] [1780734310.895885419] [microamp_factor_graph_tracking]: Added ROV 1 node (step 4) at t=1700000040.00, dt=5.000 s
+[INFO] [1780734310.900494127] [microamp_factor_graph_tracking]: Processed GNSS at 1700000041.00, NED (56.61, -16.96, -0.43).
+[INFO] [1780734310.997016627] [microamp_factor_graph_tracking]: Processed GNSS at 1700000042.00, NED (55.84, -17.74, -0.87).
+[INFO] [1780734311.098161252] [microamp_factor_graph_tracking]: Processed GNSS at 1700000043.00, NED (54.90, -18.82, 0.32).
+[INFO] [1780734311.198453794] [microamp_factor_graph_tracking]: Processed GNSS at 1700000044.00, NED (54.41, -19.32, 0.13).
+[INFO] [1780734311.303572294] [microamp_factor_graph_tracking]: Processed GNSS at 1700000045.00, NED (53.21, -20.20, -0.02).
+[INFO] [1780734311.395787919] [microamp_factor_graph_tracking]: Added ROV 1 node (step 5) at t=1700000045.00, dt=5.000 s
+[INFO] [1780734311.398217336] [microamp_factor_graph_tracking]: Processed GNSS at 1700000046.00, NED (52.12, -20.25, 0.59).
+[INFO] [1780734311.497763836] [microamp_factor_graph_tracking]: Processed GNSS at 1700000047.00, NED (50.90, -20.15, -0.94).
+[INFO] [1780734311.596575044] [microamp_factor_graph_tracking]: Processed GNSS at 1700000048.00, NED (50.78, -20.08, 0.21).
+[INFO] [1780734311.696644669] [microamp_factor_graph_tracking]: Processed GNSS at 1700000049.00, NED (48.49, -19.81, 0.26).
+[INFO] [1780734311.800478211] [microamp_factor_graph_tracking]: Processed GNSS at 1700000050.00, NED (46.88, -19.22, -0.27).
+[INFO] [1780734311.895661794] [microamp_factor_graph_tracking]: Added ROV 1 node (step 6) at t=1700000050.00, dt=5.000 s
+[INFO] [1780734311.896843836] [microamp_factor_graph_tracking]: Processed GNSS at 1700000051.00, NED (45.62, -19.15, -0.40).
+[INFO] [1780734311.996487211] [microamp_factor_graph_tracking]: Processed GNSS at 1700000052.00, NED (45.13, -17.11, 0.23).
+[INFO] [1780734312.097022628] [microamp_factor_graph_tracking]: Processed GNSS at 1700000053.00, NED (44.40, -16.43, 0.18).
+[INFO] [1780734312.199485711] [microamp_factor_graph_tracking]: Processed GNSS at 1700000054.00, NED (42.59, -16.04, -0.14).
+[INFO] [1780734312.312802420] [microamp_factor_graph_tracking]: Processed GNSS at 1700000055.00, NED (40.59, -14.01, 0.78).
+[INFO] [1780734312.395637253] [microamp_factor_graph_tracking]: Added ROV 1 node (step 7) at t=1700000055.00, dt=5.001 s
+[INFO] [1780734312.396779003] [microamp_factor_graph_tracking]: Processed GNSS at 1700000056.00, NED (39.60, -12.41, -0.18).
+[INFO] [1780734312.498112170] [microamp_factor_graph_tracking]: Processed GNSS at 1700000057.00, NED (38.91, -10.78, 0.28).
+[INFO] [1780734312.598426461] [microamp_factor_graph_tracking]: Processed GNSS at 1700000058.00, NED (37.00, -9.23, -0.93).
+[INFO] [1780734312.698280961] [microamp_factor_graph_tracking]: Processed GNSS at 1700000059.00, NED (35.51, -7.33, -0.28).
+[INFO] [1780734312.804156753] [microamp_factor_graph_tracking]: Processed GNSS at 1700000060.00, NED (33.45, -5.26, 0.27).
+[INFO] [1780734312.895866795] [microamp_factor_graph_tracking]: Added ROV 1 node (step 8) at t=1700000060.00, dt=5.000 s
+[INFO] [1780734312.909680587] [microamp_factor_graph_tracking]: Processed GNSS at 1700000061.00, NED (32.32, -3.02, -0.26).
+[INFO] [1780734312.998330128] [microamp_factor_graph_tracking]: Processed GNSS at 1700000062.00, NED (30.57, -1.17, 0.39).
+[INFO] [1780734313.098575087] [microamp_factor_graph_tracking]: Processed GNSS at 1700000063.00, NED (29.52, 0.23, -0.17).
+[INFO] [1780734313.208723795] [microamp_factor_graph_tracking]: Processed GNSS at 1700000064.00, NED (27.49, 2.50, 0.83).
+[INFO] [1780734313.303022045] [microamp_factor_graph_tracking]: Processed GNSS at 1700000065.00, NED (25.97, 4.59, 0.30).
+[INFO] [1780734313.395750420] [microamp_factor_graph_tracking]: Added ROV 1 node (step 9) at t=1700000065.00, dt=5.000 s
+[INFO] [1780734313.397894587] [microamp_factor_graph_tracking]: Processed GNSS at 1700000066.00, NED (24.89, 6.49, -0.44).
+[INFO] [1780734313.498522712] [microamp_factor_graph_tracking]: Processed GNSS at 1700000067.00, NED (23.54, 8.18, 0.23).
+[INFO] [1780734313.598474337] [microamp_factor_graph_tracking]: Processed GNSS at 1700000068.00, NED (21.87, 10.46, 0.01).
+[INFO] [1780734313.699152795] [microamp_factor_graph_tracking]: Processed GNSS at 1700000069.00, NED (20.23, 11.53, -0.03).
+[INFO] [1780734313.804821545] [microamp_factor_graph_tracking]: Processed GNSS at 1700000070.00, NED (18.84, 13.44, 0.37).
+[INFO] [1780734313.895906920] [microamp_factor_graph_tracking]: Added ROV 1 node (step 10) at t=1700000070.00, dt=5.000 s
+[INFO] [1780734313.900187795] [microamp_factor_graph_tracking]: Processed GNSS at 1700000071.00, NED (17.48, 14.68, -0.13).
+[INFO] [1780734313.999230754] [microamp_factor_graph_tracking]: Processed GNSS at 1700000072.00, NED (16.23, 15.46, 0.26).
+[INFO] [1780734314.108709045] [microamp_factor_graph_tracking]: Processed GNSS at 1700000073.00, NED (15.00, 16.45, -0.07).
+[INFO] [1780734314.198927962] [microamp_factor_graph_tracking]: Processed GNSS at 1700000074.00, NED (13.86, 18.10, 0.32).
+[INFO] [1780734314.312886879] [microamp_factor_graph_tracking]: Processed GNSS at 1700000075.00, NED (12.35, 18.31, -0.27).
+[INFO] [1780734314.395607296] [microamp_factor_graph_tracking]: Added ROV 1 node (step 11) at t=1700000075.00, dt=5.000 s
+[INFO] [1780734314.396734087] [microamp_factor_graph_tracking]: Processed GNSS at 1700000076.00, NED (11.02, 19.23, 0.12).
+[INFO] [1780734314.497401587] [microamp_factor_graph_tracking]: Processed GNSS at 1700000077.00, NED (10.50, 19.35, 0.64).
+[INFO] [1780734314.598708379] [microamp_factor_graph_tracking]: Processed GNSS at 1700000078.00, NED (9.09, 19.77, 1.16).
+[INFO] [1780734314.699001462] [microamp_factor_graph_tracking]: Processed GNSS at 1700000079.00, NED (7.81, 20.32, -0.35).
+[INFO] [1780734314.815270129] [microamp_factor_graph_tracking]: Processed GNSS at 1700000080.00, NED (7.47, 19.53, -0.63).
+[INFO] [1780734314.895919212] [microamp_factor_graph_tracking]: Added ROV 1 node (step 12) at t=1700000080.00, dt=5.000 s
+[INFO] [1780734314.910387504] [microamp_factor_graph_tracking]: Processed GNSS at 1700000081.00, NED (6.53, 19.22, 0.46).
+[INFO] [1780734314.998865338] [microamp_factor_graph_tracking]: Processed GNSS at 1700000082.00, NED (5.34, 18.40, -0.18).
+[INFO] [1780734315.100253546] [microamp_factor_graph_tracking]: Processed GNSS at 1700000083.00, NED (4.40, 17.45, -0.30).
+[INFO] [1780734315.198887338] [microamp_factor_graph_tracking]: Processed GNSS at 1700000084.00, NED (4.02, 16.92, 0.29).
+[INFO] [1780734315.313996338] [microamp_factor_graph_tracking]: Processed GNSS at 1700000085.00, NED (3.57, 15.56, 0.67).
+[INFO] [1780734315.395917338] [microamp_factor_graph_tracking]: Added ROV 1 node (step 13) at t=1700000085.00, dt=5.000 s
+[INFO] [1780734315.399603921] [microamp_factor_graph_tracking]: Processed GNSS at 1700000086.00, NED (2.85, 13.58, 0.55).
+[INFO] [1780734315.499076338] [microamp_factor_graph_tracking]: Processed GNSS at 1700000087.00, NED (1.70, 13.21, 0.05).
+[INFO] [1780734315.598719671] [microamp_factor_graph_tracking]: Processed GNSS at 1700000088.00, NED (1.70, 11.23, 0.42).
+[INFO] [1780734315.697428546] [microamp_factor_graph_tracking]: Processed GNSS at 1700000089.00, NED (1.04, 9.63, 0.56).
+[INFO] [1780734315.813224921] [microamp_factor_graph_tracking]: Processed GNSS at 1700000090.00, NED (1.07, 7.26, -0.02).
+[INFO] [1780734315.895946296] [microamp_factor_graph_tracking]: Added ROV 1 node (step 14) at t=1700000090.00, dt=5.000 s
+[INFO] [1780734315.909449005] [microamp_factor_graph_tracking]: Processed GNSS at 1700000091.00, NED (1.02, 5.96, 0.04).
+[INFO] [1780734315.999345713] [microamp_factor_graph_tracking]: Processed GNSS at 1700000092.00, NED (0.25, 4.18, -0.10).
+[INFO] [1780734316.100557880] [microamp_factor_graph_tracking]: Processed GNSS at 1700000093.00, NED (0.62, 2.35, 0.72).
+[INFO] [1780734316.199334671] [microamp_factor_graph_tracking]: Processed GNSS at 1700000094.00, NED (0.50, 0.23, 0.33).
+[INFO] [1780734316.313560671] [microamp_factor_graph_tracking]: Processed GNSS at 1700000095.00, NED (0.08, -1.43, 0.48).
+[INFO] [1780734316.395640880] [microamp_factor_graph_tracking]: Added ROV 1 node (step 15) at t=1700000095.00, dt=5.000 s
+[INFO] [1780734316.397021713] [microamp_factor_graph_tracking]: Processed GNSS at 1700000096.00, NED (0.24, -4.02, 0.06).
+[INFO] [1780734316.497659672] [microamp_factor_graph_tracking]: Processed GNSS at 1700000097.00, NED (0.82, -5.80, 0.09).
+[INFO] [1780734316.599160755] [microamp_factor_graph_tracking]: Processed GNSS at 1700000098.00, NED (0.53, -7.21, 0.20).
+[INFO] [1780734316.707561630] [microamp_factor_graph_tracking]: Processed GNSS at 1700000099.00, NED (0.78, -9.12, 0.33).
+[INFO] [1780734316.814400463] [microamp_factor_graph_tracking]: Processed GNSS at 1700000100.00, NED (1.24, -11.35, 0.52).
+[INFO] [1780734316.895726797] [microamp_factor_graph_tracking]: Added ROV 1 node (step 16) at t=1700000100.00, dt=5.000 s
+[INFO] [1780734316.898992130] [microamp_factor_graph_tracking]: Processed GNSS at 1700000101.00, NED (2.22, -12.64, -0.21).
+[INFO] [1780734317.000071797] [microamp_factor_graph_tracking]: Processed GNSS at 1700000102.00, NED (3.41, -14.51, -0.49).
+[INFO] [1780734317.098760380] [microamp_factor_graph_tracking]: Processed GNSS at 1700000103.00, NED (3.67, -15.21, -0.55).
+[INFO] [1780734317.197898755] [microamp_factor_graph_tracking]: Processed GNSS at 1700000104.00, NED (4.08, -16.34, 0.13).
+[INFO] [1780734317.312261922] [microamp_factor_graph_tracking]: Processed GNSS at 1700000105.00, NED (4.90, -18.06, -0.15).
+[INFO] [1780734317.395936589] [microamp_factor_graph_tracking]: Added ROV 1 node (step 17) at t=1700000105.00, dt=5.001 s
+[INFO] [1780734317.409651255] [microamp_factor_graph_tracking]: Processed GNSS at 1700000106.00, NED (5.65, -18.71, 0.67).
+[INFO] [1780734317.499187797] [microamp_factor_graph_tracking]: Processed GNSS at 1700000107.00, NED (6.39, -19.30, 0.82).
+[INFO] [1780734317.599415797] [microamp_factor_graph_tracking]: Processed GNSS at 1700000108.00, NED (7.47, -19.07, 0.35).
+[INFO] [1780734317.709003589] [microamp_factor_graph_tracking]: Processed GNSS at 1700000109.00, NED (8.39, -19.64, -0.12).
+[INFO] [1780734317.813192506] [microamp_factor_graph_tracking]: Processed GNSS at 1700000110.00, NED (9.25, -19.41, 0.33).
+[INFO] [1780734317.895951756] [microamp_factor_graph_tracking]: Added ROV 1 node (step 18) at t=1700000110.00, dt=4.999 s
+[INFO] [1780734317.911007881] [microamp_factor_graph_tracking]: Processed GNSS at 1700000111.00, NED (10.82, -19.40, -0.56).
+[INFO] [1780734317.999505131] [microamp_factor_graph_tracking]: Processed GNSS at 1700000112.00, NED (11.36, -18.99, 0.63).
+[INFO] [1780734318.099736797] [microamp_factor_graph_tracking]: Processed GNSS at 1700000113.00, NED (12.26, -18.90, 0.43).
+[INFO] [1780734318.198971547] [microamp_factor_graph_tracking]: Processed GNSS at 1700000114.00, NED (13.55, -17.88, 0.47).
+[INFO] [1780734318.313517672] [microamp_factor_graph_tracking]: Processed GNSS at 1700000115.00, NED (14.91, -16.85, 0.13).
+[INFO] [1780734318.395908297] [microamp_factor_graph_tracking]: Added ROV 1 node (step 19) at t=1700000115.00, dt=5.000 s
+[INFO] [1780734318.401036131] [microamp_factor_graph_tracking]: Processed GNSS at 1700000116.00, NED (16.05, -15.84, 1.32).
+[INFO] [1780734318.497018881] [microamp_factor_graph_tracking]: Processed GNSS at 1700000117.00, NED (17.43, -14.79, -0.25).
+[INFO] [1780734318.598637673] [microamp_factor_graph_tracking]: Processed GNSS at 1700000118.00, NED (18.80, -12.97, 0.07).
+[INFO] [1780734318.702607673] [microamp_factor_graph_tracking]: Processed GNSS at 1700000119.00, NED (19.74, -12.02, -0.73).
+[INFO] [1780734318.821166756] [microamp_factor_graph_tracking]: Processed GNSS at 1700000120.00, NED (21.65, -10.48, 0.68).
+[INFO] [1780734318.896231381] [microamp_factor_graph_tracking]: Added ROV 1 node (step 20) at t=1700000120.00, dt=5.000 s
+[INFO] [1780734318.905718923] [microamp_factor_graph_tracking]: Processed GNSS at 1700000121.00, NED (23.12, -8.45, 0.13).
+[INFO] [1780734319.000244339] [microamp_factor_graph_tracking]: Processed GNSS at 1700000122.00, NED (24.23, -6.44, 0.35).
+[INFO] [1780734319.108699048] [microamp_factor_graph_tracking]: Processed GNSS at 1700000123.00, NED (25.34, -4.94, 0.19).
+[INFO] [1780734319.197032715] [microamp_factor_graph_tracking]: Processed GNSS at 1700000124.00, NED (26.59, -2.94, 0.26).
+[INFO] [1780734319.310396423] [microamp_factor_graph_tracking]: Processed GNSS at 1700000125.00, NED (29.21, -0.51, 0.37).
+[INFO] [1780734319.396350840] [microamp_factor_graph_tracking]: Added ROV 1 node (step 21) at t=1700000125.00, dt=5.000 s
+[INFO] [1780734319.401536173] [microamp_factor_graph_tracking]: Processed GNSS at 1700000126.00, NED (30.69, 0.24, -0.03).
+[INFO] [1780734319.500941131] [microamp_factor_graph_tracking]: Processed GNSS at 1700000127.00, NED (32.32, 2.96, 0.18).
+[INFO] [1780734319.615504506] [microamp_factor_graph_tracking]: Processed GNSS at 1700000128.00, NED (33.42, 4.83, -0.58).
+[INFO] [1780734319.702230715] [microamp_factor_graph_tracking]: Processed GNSS at 1700000129.00, NED (35.08, 6.72, 0.42).
+[INFO] [1780734319.807014881] [microamp_factor_graph_tracking]: Processed GNSS at 1700000130.00, NED (35.95, 9.14, -0.12).
+[INFO] [1780734319.898198548] [microamp_factor_graph_tracking]: Processed GNSS at 1700000131.00, NED (37.75, 10.59, -0.63).
+[INFO] [1780734319.997213423] [microamp_factor_graph_tracking]: Processed GNSS at 1700000132.00, NED (39.43, 12.56, 0.27).
+[INFO] [1780734320.100797048] [microamp_factor_graph_tracking]: Processed GNSS at 1700000133.00, NED (40.97, 13.94, 0.87).
+[INFO] [1780734320.200782590] [microamp_factor_graph_tracking]: Processed GNSS at 1700000134.00, NED (41.57, 14.79, 0.33).
+[INFO] [1780734320.314149298] [microamp_factor_graph_tracking]: Processed GNSS at 1700000135.00, NED (43.83, 17.06, -0.59).
+[INFO] [1780734320.395917923] [microamp_factor_graph_tracking]: Added ROV 1 node (step 22) at t=1700000135.00, dt=10.000 s
+[INFO] [1780734320.401634048] [microamp_factor_graph_tracking]: Processed GNSS at 1700000136.00, NED (45.05, 17.91, 0.65).
+[INFO] [1780734320.496578840] [microamp_factor_graph_tracking]: Processed GNSS at 1700000137.00, NED (45.85, 18.91, 0.18).
+[INFO] [1780734320.596570632] [microamp_factor_graph_tracking]: Processed GNSS at 1700000138.00, NED (47.41, 19.37, -0.03).
+[INFO] [1780734320.698427507] [microamp_factor_graph_tracking]: Processed GNSS at 1700000139.00, NED (48.64, 19.69, 0.15).
+[INFO] [1780734320.808721715] [microamp_factor_graph_tracking]: Processed GNSS at 1700000140.00, NED (50.14, 20.09, -0.50).
+[INFO] [1780734320.895978799] [microamp_factor_graph_tracking]: Added ROV 1 node (step 23) at t=1700000140.00, dt=5.001 s
+[INFO] [1780734320.910769465] [microamp_factor_graph_tracking]: Processed GNSS at 1700000141.00, NED (50.81, 20.57, -0.57).
+[INFO] [1780734320.999280382] [microamp_factor_graph_tracking]: Processed GNSS at 1700000142.00, NED (51.96, 20.14, 0.23).
+[INFO] [1780734321.099884632] [microamp_factor_graph_tracking]: Processed GNSS at 1700000143.00, NED (52.92, 20.24, 1.02).
+[INFO] [1780734321.199934799] [microamp_factor_graph_tracking]: Processed GNSS at 1700000144.00, NED (54.42, 19.73, -0.08).
+[INFO] [1780734321.309865632] [microamp_factor_graph_tracking]: Processed GNSS at 1700000145.00, NED (54.74, 18.94, 0.33).
+[INFO] [1780734321.395964549] [microamp_factor_graph_tracking]: Added ROV 1 node (step 24) at t=1700000145.00, dt=5.000 s
+[INFO] [1780734321.400998549] [microamp_factor_graph_tracking]: Processed GNSS at 1700000146.00, NED (55.88, 17.92, 0.13).
+[INFO] [1780734321.499180757] [microamp_factor_graph_tracking]: Processed GNSS at 1700000147.00, NED (56.70, 16.98, -0.74).
+[INFO] [1780734321.610365674] [microamp_factor_graph_tracking]: Processed GNSS at 1700000148.00, NED (57.27, 15.64, -0.21).
+[INFO] [1780734321.708975466] [microamp_factor_graph_tracking]: Processed GNSS at 1700000149.00, NED (58.36, 14.13, -0.43).
+[INFO] [1780734321.816221841] [microamp_factor_graph_tracking]: Processed GNSS at 1700000150.00, NED (58.56, 12.62, 0.27).
+[INFO] [1780734321.899783549] [microamp_factor_graph_tracking]: Processed GNSS at 1700000151.00, NED (58.65, 11.12, 0.66).
+[INFO] [1780734321.999281549] [microamp_factor_graph_tracking]: Processed GNSS at 1700000152.00, NED (59.50, 9.93, 0.78).
+[INFO] [1780734322.098417841] [microamp_factor_graph_tracking]: Processed GNSS at 1700000153.00, NED (59.60, 7.56, 0.20).
+[INFO] [1780734322.212572466] [microamp_factor_graph_tracking]: Processed GNSS at 1700000154.00, NED (60.28, 5.52, 0.46).
+[INFO] [1780734322.314063924] [microamp_factor_graph_tracking]: Processed GNSS at 1700000155.00, NED (60.15, 3.58, 0.29).
+[INFO] [1780734322.395958674] [microamp_factor_graph_tracking]: Added ROV 1 node (step 25) at t=1700000155.00, dt=10.000 s
+[INFO] [1780734322.401569133] [microamp_factor_graph_tracking]: Processed GNSS at 1700000156.00, NED (60.22, 2.04, 0.31).
+[INFO] [1780734322.498751341] [microamp_factor_graph_tracking]: Processed GNSS at 1700000157.00, NED (59.90, -0.62, -1.45).
+[INFO] [1780734322.598156758] [microamp_factor_graph_tracking]: Processed GNSS at 1700000158.00, NED (60.84, -1.97, 0.30).
+[INFO] [1780734322.699320841] [microamp_factor_graph_tracking]: Processed GNSS at 1700000159.00, NED (59.72, -4.25, -0.55).
+[INFO] [1780734322.810856008] [microamp_factor_graph_tracking]: Processed GNSS at 1700000160.00, NED (59.96, -6.14, -0.17).
+[INFO] [1780734322.896028091] [microamp_factor_graph_tracking]: Added ROV 1 node (step 26) at t=1700000160.00, dt=5.000 s
+[INFO] [1780734322.901246341] [microamp_factor_graph_tracking]: Processed GNSS at 1700000161.00, NED (59.81, -7.96, 0.03).
+[INFO] [1780734323.010090300] [microamp_factor_graph_tracking]: Processed GNSS at 1700000162.00, NED (59.34, -9.84, -0.04).
+[INFO] [1780734323.099172508] [microamp_factor_graph_tracking]: Processed GNSS at 1700000163.00, NED (58.94, -11.53, -0.95).
+[INFO] [1780734323.200262550] [microamp_factor_graph_tracking]: Processed GNSS at 1700000164.00, NED (58.28, -13.43, -0.19).
+[INFO] [1780734323.309935425] [microamp_factor_graph_tracking]: Processed GNSS at 1700000165.00, NED (57.90, -14.53, -0.76).
+[INFO] [1780734323.395985258] [microamp_factor_graph_tracking]: Added ROV 1 node (step 27) at t=1700000165.00, dt=5.001 s
+[INFO] [1780734323.401004925] [microamp_factor_graph_tracking]: Processed GNSS at 1700000166.00, NED (56.90, -15.56, 0.22).
+[INFO] [1780734323.500187758] [microamp_factor_graph_tracking]: Processed GNSS at 1700000167.00, NED (56.58, -17.24, 0.59).
+[INFO] [1780734323.600636967] [microamp_factor_graph_tracking]: Processed GNSS at 1700000168.00, NED (55.80, -17.62, 0.00).
+[INFO] [1780734323.698995967] [microamp_factor_graph_tracking]: Processed GNSS at 1700000169.00, NED (55.16, -19.29, 0.24).
+[INFO] [1780734323.815341842] [microamp_factor_graph_tracking]: Processed GNSS at 1700000170.00, NED (53.82, -19.64, -0.77).
+[INFO] [1780734323.901483050] [microamp_factor_graph_tracking]: Processed GNSS at 1700000171.00, NED (52.61, -19.74, -0.10).
+[INFO] [1780734324.001863967] [microamp_factor_graph_tracking]: Processed GNSS at 1700000172.00, NED (51.74, -20.70, -0.06).
+[INFO] [1780734324.111629342] [microamp_factor_graph_tracking]: Processed GNSS at 1700000173.00, NED (51.20, -20.03, 0.07).
+[INFO] [1780734324.212498467] [microamp_factor_graph_tracking]: Processed GNSS at 1700000174.00, NED (49.85, -20.26, -0.52).
+[INFO] [1780734324.305383925] [microamp_factor_graph_tracking]: Processed GNSS at 1700000175.00, NED (48.22, -19.21, -0.08).
+[INFO] [1780734324.396004592] [microamp_factor_graph_tracking]: Added ROV 1 node (step 28) at t=1700000175.00, dt=10.000 s
+[INFO] [1780734324.402711134] [microamp_factor_graph_tracking]: Processed GNSS at 1700000176.00, NED (47.08, -18.74, 0.11).
+[INFO] [1780734324.501363050] [microamp_factor_graph_tracking]: Processed GNSS at 1700000177.00, NED (45.78, -18.87, 0.22).
+[INFO] [1780734324.596849217] [microamp_factor_graph_tracking]: Processed GNSS at 1700000178.00, NED (44.97, -17.43, 0.48).
+[INFO] [1780734324.701763009] [microamp_factor_graph_tracking]: Processed GNSS at 1700000179.00, NED (43.30, -15.96, -0.50).
+[INFO] [1780734324.813770217] [microamp_factor_graph_tracking]: Processed GNSS at 1700000180.00, NED (42.10, -15.19, 0.05).
+[INFO] [1780734324.895999801] [microamp_factor_graph_tracking]: Added ROV 1 node (step 29) at t=1700000180.00, dt=5.000 s
+[INFO] [1780734324.903181551] [microamp_factor_graph_tracking]: Processed GNSS at 1700000181.00, NED (40.39, -13.25, -0.12).
+[INFO] [1780734325.000206009] [microamp_factor_graph_tracking]: Processed GNSS at 1700000182.00, NED (38.98, -11.50, -0.42).
+[INFO] [1780734325.100272842] [microamp_factor_graph_tracking]: Processed GNSS at 1700000183.00, NED (37.70, -10.35, 0.71).
+[INFO] [1780734325.200944717] [microamp_factor_graph_tracking]: Processed GNSS at 1700000184.00, NED (36.24, -8.97, 0.31).
+[INFO] [1780734325.317616634] [microamp_factor_graph_tracking]: Processed GNSS at 1700000185.00, NED (34.53, -7.24, -0.43).
+[INFO] [1780734325.395887967] [microamp_factor_graph_tracking]: Added ROV 1 node (step 30) at t=1700000185.00, dt=4.999 s
+[INFO] [1780734325.400590509] [microamp_factor_graph_tracking]: Processed GNSS at 1700000186.00, NED (33.63, -4.63, 0.96).
+[INFO] [1780734325.500715134] [microamp_factor_graph_tracking]: Processed GNSS at 1700000187.00, NED (31.31, -3.11, 0.39).
+[INFO] [1780734325.600979968] [microamp_factor_graph_tracking]: Processed GNSS at 1700000188.00, NED (30.36, -1.18, -0.40).
+[INFO] [1780734325.701545051] [microamp_factor_graph_tracking]: Processed GNSS at 1700000189.00, NED (29.00, 0.91, 0.54).
+[INFO] [1780734325.814501634] [microamp_factor_graph_tracking]: Processed GNSS at 1700000190.00, NED (27.10, 2.99, 0.07).
+[INFO] [1780734325.896089134] [microamp_factor_graph_tracking]: Added ROV 1 node (step 31) at t=1700000190.00, dt=5.000 s
+[INFO] [1780734325.901851926] [microamp_factor_graph_tracking]: Processed GNSS at 1700000191.00, NED (25.68, 4.88, -0.34).
+[INFO] [1780734326.001564301] [microamp_factor_graph_tracking]: Processed GNSS at 1700000192.00, NED (24.05, 6.91, 0.19).
+[INFO] [1780734326.099791051] [microamp_factor_graph_tracking]: Processed GNSS at 1700000193.00, NED (22.59, 8.73, 0.47).
+[INFO] [1780734326.200829926] [microamp_factor_graph_tracking]: Processed GNSS at 1700000194.00, NED (21.11, 10.51, 0.39).
+[INFO] [1780734326.311762260] [microamp_factor_graph_tracking]: Processed GNSS at 1700000195.00, NED (20.05, 11.97, -0.27).
+[INFO] [1780734326.396104093] [microamp_factor_graph_tracking]: Added ROV 1 node (step 32) at t=1700000195.00, dt=5.000 s
+[INFO] [1780734326.401560260] [microamp_factor_graph_tracking]: Processed GNSS at 1700000196.00, NED (18.33, 14.49, 0.03).
+[INFO] [1780734326.500187343] [microamp_factor_graph_tracking]: Processed GNSS at 1700000197.00, NED (17.16, 14.70, 0.93).
+[INFO] [1780734326.597058635] [microamp_factor_graph_tracking]: Processed GNSS at 1700000198.00, NED (15.65, 16.01, 0.32).
+[INFO] [1780734326.699425468] [microamp_factor_graph_tracking]: Processed GNSS at 1700000199.00, NED (14.10, 17.06, 0.43).
+[INFO] [1780734326.812615968] [microamp_factor_graph_tracking]: Processed GNSS at 1700000200.00, NED (13.39, 18.08, -0.18).
+[INFO] [1780734326.897005677] [microamp_factor_graph_tracking]: Added ROV 1 node (step 33) at t=1700000200.00, dt=5.000 s
+[INFO] [1780734326.902661302] [microamp_factor_graph_tracking]: Processed GNSS at 1700000201.00, NED (11.92, 18.67, -1.24).
+[INFO] [1780734327.000103302] [microamp_factor_graph_tracking]: Processed GNSS at 1700000202.00, NED (11.04, 19.28, 0.69).
+[INFO] [1780734327.100633177] [microamp_factor_graph_tracking]: Processed GNSS at 1700000203.00, NED (9.89, 19.85, -0.12).
+[INFO] [1780734327.200848885] [microamp_factor_graph_tracking]: Processed GNSS at 1700000204.00, NED (9.06, 19.24, 0.64).
+[INFO] [1780734327.316138010] [microamp_factor_graph_tracking]: Processed GNSS at 1700000205.00, NED (8.07, 19.12, 0.13).
+[INFO] [1780734327.396530427] [microamp_factor_graph_tracking]: Added ROV 1 node (step 34) at t=1700000205.00, dt=5.001 s
+[INFO] [1780734327.402898510] [microamp_factor_graph_tracking]: Processed GNSS at 1700000206.00, NED (6.58, 18.98, 0.53).
+[INFO] [1780734327.501127010] [microamp_factor_graph_tracking]: Processed GNSS at 1700000207.00, NED (5.92, 18.69, 0.18).
+[INFO] [1780734327.600228260] [microamp_factor_graph_tracking]: Processed GNSS at 1700000208.00, NED (4.83, 18.18, -0.04).
+[INFO] [1780734327.700106510] [microamp_factor_graph_tracking]: Processed GNSS at 1700000209.00, NED (4.82, 17.48, -0.22).
+[INFO] [1780734327.811245552] [microamp_factor_graph_tracking]: Processed GNSS at 1700000210.00, NED (3.25, 16.29, -0.11).
+[INFO] [1780734327.895999802] [microamp_factor_graph_tracking]: Added ROV 1 node (step 35) at t=1700000210.00, dt=5.000 s
+[INFO] [1780734327.901582010] [microamp_factor_graph_tracking]: Processed GNSS at 1700000211.00, NED (3.17, 15.06, -0.30).
+[INFO] [1780734328.000794885] [microamp_factor_graph_tracking]: Processed GNSS at 1700000212.00, NED (2.62, 13.71, 0.59).
+[INFO] [1780734328.100669802] [microamp_factor_graph_tracking]: Processed GNSS at 1700000213.00, NED (1.96, 12.57, 0.29).
+[INFO] [1780734328.200827219] [microamp_factor_graph_tracking]: Processed GNSS at 1700000214.00, NED (1.60, 10.32, -0.46).
+[INFO] [1780734328.314218344] [microamp_factor_graph_tracking]: Processed GNSS at 1700000215.00, NED (1.14, 9.19, -0.13).
+[INFO] [1780734328.396021511] [microamp_factor_graph_tracking]: Added ROV 1 node (step 36) at t=1700000215.00, dt=5.000 s
+[INFO] [1780734328.414467302] [microamp_factor_graph_tracking]: Processed GNSS at 1700000216.00, NED (0.59, 7.22, 0.87).
+[INFO] [1780734328.510679302] [microamp_factor_graph_tracking]: Processed GNSS at 1700000217.00, NED (0.58, 5.13, -0.07).
+[INFO] [1780734328.600878636] [microamp_factor_graph_tracking]: Processed GNSS at 1700000218.00, NED (0.91, 3.33, 0.52).
+[INFO] [1780734328.696966761] [microamp_factor_graph_tracking]: Processed GNSS at 1700000219.00, NED (0.26, 1.74, 0.06).
+[INFO] [1780734328.812943761] [microamp_factor_graph_tracking]: Processed GNSS at 1700000220.00, NED (-0.17, -0.07, 0.12).
+[INFO] [1780734328.901984052] [microamp_factor_graph_tracking]: Processed GNSS at 1700000221.00, NED (0.43, -2.26, 0.62).
+[INFO] [1780734329.001615469] [microamp_factor_graph_tracking]: Processed GNSS at 1700000222.00, NED (1.00, -4.31, 0.15).
+[INFO] [1780734329.102650178] [microamp_factor_graph_tracking]: Processed GNSS at 1700000223.00, NED (1.06, -5.82, -0.32).
+[INFO] [1780734329.200997636] [microamp_factor_graph_tracking]: Processed GNSS at 1700000224.00, NED (0.79, -8.47, 0.20).
+[INFO] [1780734329.313016011] [microamp_factor_graph_tracking]: Processed GNSS at 1700000225.00, NED (1.20, -9.84, 0.10).
+[INFO] [1780734329.395889803] [microamp_factor_graph_tracking]: Added ROV 1 node (step 37) at t=1700000225.00, dt=10.000 s
+[INFO] [1780734329.409825344] [microamp_factor_graph_tracking]: Processed GNSS at 1700000226.00, NED (1.67, -11.88, 0.06).
+[INFO] [1780734329.500123636] [microamp_factor_graph_tracking]: Processed GNSS at 1700000227.00, NED (1.73, -14.03, 0.78).
+[INFO] [1780734329.601030344] [microamp_factor_graph_tracking]: Processed GNSS at 1700000228.00, NED (2.67, -14.34, 0.82).
+[INFO] [1780734329.701442970] [microamp_factor_graph_tracking]: Processed GNSS at 1700000229.00, NED (3.48, -15.61, 0.79).
+[INFO] [1780734329.803760845] [microamp_factor_graph_tracking]: Processed GNSS at 1700000230.00, NED (3.56, -16.66, 0.81).
+[INFO] [1780734329.895781470] [microamp_factor_graph_tracking]: Added ROV 1 node (step 38) at t=1700000230.00, dt=5.000 s
+[INFO] [1780734329.897849345] [microamp_factor_graph_tracking]: Processed GNSS at 1700000231.00, NED (5.30, -17.39, 0.14).
+[INFO] [1780734329.997094511] [microamp_factor_graph_tracking]: Processed GNSS at 1700000232.00, NED (5.63, -18.59, -0.41).
+[INFO] [1780734330.100270845] [microamp_factor_graph_tracking]: Processed GNSS at 1700000233.00, NED (6.50, -19.04, -0.11).
+[INFO] [1780734330.201749261] [microamp_factor_graph_tracking]: Processed GNSS at 1700000234.00, NED (7.55, -19.76, 0.22).
+[INFO] [1780734330.314719178] [microamp_factor_graph_tracking]: Processed GNSS at 1700000235.00, NED (8.64, -19.68, 0.18).
+[INFO] [1780734330.396066553] [microamp_factor_graph_tracking]: Added ROV 1 node (step 39) at t=1700000235.00, dt=5.000 s
+[INFO] [1780734330.402687803] [microamp_factor_graph_tracking]: Processed GNSS at 1700000236.00, NED (9.10, -19.86, 0.90).
+[INFO] [1780734330.499993178] [microamp_factor_graph_tracking]: Processed GNSS at 1700000237.00, NED (10.71, -19.41, 0.77).
+[INFO] [1780734330.611356262] [microamp_factor_graph_tracking]: Processed GNSS at 1700000238.00, NED (11.62, -19.37, -0.00).
+[INFO] [1780734330.697175887] [microamp_factor_graph_tracking]: Processed GNSS at 1700000239.00, NED (12.95, -18.79, 0.48).
+[INFO] [1780734330.805499762] [microamp_factor_graph_tracking]: Processed GNSS at 1700000240.00, NED (13.58, -17.31, 0.01).
+[INFO] [1780734330.896009428] [microamp_factor_graph_tracking]: Added ROV 1 node (step 40) at t=1700000240.00, dt=5.001 s
+[INFO] [1780734330.900995887] [microamp_factor_graph_tracking]: Processed GNSS at 1700000241.00, NED (14.95, -16.79, -0.37).
+[INFO] [1780734331.001552262] [microamp_factor_graph_tracking]: Processed GNSS at 1700000242.00, NED (16.51, -15.82, -0.03).
+[INFO] [1780734331.100704762] [microamp_factor_graph_tracking]: Processed GNSS at 1700000243.00, NED (17.16, -14.44, 0.31).
+[INFO] [1780734331.211142804] [microamp_factor_graph_tracking]: Processed GNSS at 1700000244.00, NED (19.28, -12.92, -0.83).
+[INFO] [1780734331.313197304] [microamp_factor_graph_tracking]: Processed GNSS at 1700000245.00, NED (20.62, -10.78, 0.30).
+[INFO] [1780734331.396019929] [microamp_factor_graph_tracking]: Added ROV 1 node (step 41) at t=1700000245.00, dt=4.999 s
+[INFO] [1780734331.413184720] [microamp_factor_graph_tracking]: Processed GNSS at 1700000246.00, NED (22.42, -9.50, -0.04).
+[INFO] [1780734331.501722220] [microamp_factor_graph_tracking]: Processed GNSS at 1700000247.00, NED (23.67, -8.54, 0.10).
+[INFO] [1780734331.602516970] [microamp_factor_graph_tracking]: Processed GNSS at 1700000248.00, NED (24.59, -6.07, -0.35).
+[INFO] [1780734331.701366554] [microamp_factor_graph_tracking]: Processed GNSS at 1700000249.00, NED (26.58, -4.23, 1.44).
+[INFO] [1780734331.814349804] [microamp_factor_graph_tracking]: Processed GNSS at 1700000250.00, NED (28.27, -1.77, -0.77).
+[INFO] [1780734331.895997887] [microamp_factor_graph_tracking]: Added ROV 1 node (step 42) at t=1700000250.00, dt=5.000 s
+[INFO] [1780734331.898931846] [microamp_factor_graph_tracking]: Processed GNSS at 1700000251.00, NED (29.55, -0.26, 0.75).
+[INFO] [1780734331.997195804] [microamp_factor_graph_tracking]: Processed GNSS at 1700000252.00, NED (30.76, 1.38, -1.10).
+[INFO] [1780734332.098585846] [microamp_factor_graph_tracking]: Processed GNSS at 1700000253.00, NED (32.63, 3.30, 0.44).
+[INFO] [1780734332.200114762] [microamp_factor_graph_tracking]: Processed GNSS at 1700000254.00, NED (33.78, 5.74, -0.83).
+[INFO] [1780734332.327155471] [microamp_factor_graph_tracking]: Processed GNSS at 1700000255.00, NED (35.48, 7.68, -0.64).
+[INFO] [1780734332.396014929] [microamp_factor_graph_tracking]: Added ROV 1 node (step 43) at t=1700000255.00, dt=5.000 s
+[INFO] [1780734332.399139929] [microamp_factor_graph_tracking]: Processed GNSS at 1700000256.00, NED (37.20, 9.18, 0.09).
+[INFO] [1780734332.501495263] [microamp_factor_graph_tracking]: Processed GNSS at 1700000257.00, NED (38.33, 10.95, 0.10).
+[INFO] [1780734332.604896388] [microamp_factor_graph_tracking]: Processed GNSS at 1700000258.00, NED (39.80, 12.75, -0.56).
+[INFO] [1780734332.697537513] [microamp_factor_graph_tracking]: Processed GNSS at 1700000259.00, NED (41.06, 14.06, -0.15).
+[INFO] [1780734332.830651013] [microamp_factor_graph_tracking]: Processed GNSS at 1700000260.00, NED (42.67, 15.42, 0.04).
+[INFO] [1780734332.895848554] [microamp_factor_graph_tracking]: Added ROV 1 node (step 44) at t=1700000260.00, dt=5.000 s
+[INFO] [1780734332.899750929] [microamp_factor_graph_tracking]: Processed GNSS at 1700000261.00, NED (43.98, 16.53, -0.05).
+[INFO] [1780734332.997385638] [microamp_factor_graph_tracking]: Processed GNSS at 1700000262.00, NED (45.01, 18.20, 0.31).
+[INFO] [1780734333.099549096] [microamp_factor_graph_tracking]: Processed GNSS at 1700000263.00, NED (46.25, 18.50, 0.21).
+[INFO] [1780734333.201719763] [microamp_factor_graph_tracking]: Processed GNSS at 1700000264.00, NED (48.07, 19.27, 0.18).
+[INFO] [1780734333.314741596] [microamp_factor_graph_tracking]: Processed GNSS at 1700000265.00, NED (48.70, 20.03, -0.03).
+[INFO] [1780734333.396162888] [microamp_factor_graph_tracking]: Added ROV 1 node (step 45) at t=1700000265.00, dt=5.000 s
+[INFO] [1780734333.411841430] [microamp_factor_graph_tracking]: Processed GNSS at 1700000266.00, NED (49.66, 20.40, -0.56).
+[INFO] [1780734333.512176096] [microamp_factor_graph_tracking]: Processed GNSS at 1700000267.00, NED (51.84, 20.21, 0.80).
+[INFO] [1780734333.602487971] [microamp_factor_graph_tracking]: Processed GNSS at 1700000268.00, NED (52.65, 20.13, -0.37).
+[INFO] [1780734333.701934388] [microamp_factor_graph_tracking]: Processed GNSS at 1700000269.00, NED (53.46, 19.95, 0.84).
+[INFO] [1780734333.815039471] [microamp_factor_graph_tracking]: Processed GNSS at 1700000270.00, NED (54.73, 19.69, -0.96).
+[INFO] [1780734333.896650597] [microamp_factor_graph_tracking]: Added ROV 1 node (step 46) at t=1700000270.00, dt=5.000 s
+[INFO] [1780734333.902977888] [microamp_factor_graph_tracking]: Processed GNSS at 1700000271.00, NED (55.83, 17.72, -0.89).
+[INFO] [1780734334.002011472] [microamp_factor_graph_tracking]: Processed GNSS at 1700000272.00, NED (56.18, 17.37, -0.52).
+[INFO] [1780734334.102582305] [microamp_factor_graph_tracking]: Processed GNSS at 1700000273.00, NED (57.34, 16.41, 0.64).
+[INFO] [1780734334.199906055] [microamp_factor_graph_tracking]: Processed GNSS at 1700000274.00, NED (58.15, 15.16, -0.02).
+[INFO] [1780734334.314738013] [microamp_factor_graph_tracking]: Processed GNSS at 1700000275.00, NED (58.51, 14.23, 0.46).
+[INFO] [1780734334.396216388] [microamp_factor_graph_tracking]: Added ROV 1 node (step 47) at t=1700000275.00, dt=5.000 s
+[INFO] [1780734334.403161763] [microamp_factor_graph_tracking]: Processed GNSS at 1700000276.00, NED (58.57, 12.47, 0.04).
+[INFO] [1780734334.500151388] [microamp_factor_graph_tracking]: Processed GNSS at 1700000277.00, NED (59.05, 10.43, 0.55).
+[INFO] [1780734334.602564680] [microamp_factor_graph_tracking]: Processed GNSS at 1700000278.00, NED (59.29, 9.27, -0.46).
+[INFO] [1780734334.700190014] [microamp_factor_graph_tracking]: Processed GNSS at 1700000279.00, NED (60.08, 7.11, -0.04).
+[INFO] [1780734334.806177055] [microamp_factor_graph_tracking]: Processed GNSS at 1700000280.00, NED (60.33, 5.39, 0.20).
+[INFO] [1780734334.896116847] [microamp_factor_graph_tracking]: Added ROV 1 node (step 48) at t=1700000280.00, dt=5.000 s
+[INFO] [1780734334.899744264] [microamp_factor_graph_tracking]: Processed GNSS at 1700000281.00, NED (60.17, 3.33, 0.91).
+[INFO] [1780734335.010484305] [microamp_factor_graph_tracking]: Processed GNSS at 1700000282.00, NED (60.82, 1.19, -0.27).
+[INFO] [1780734335.100480222] [microamp_factor_graph_tracking]: Processed GNSS at 1700000283.00, NED (60.41, -0.59, 0.42).
+[INFO] [1780734335.201890875] [microamp_factor_graph_tracking]: Processed GNSS at 1700000284.00, NED (60.81, -2.53, 0.44).
+[INFO] [1780734335.316697208] [microamp_factor_graph_tracking]: Processed GNSS at 1700000285.00, NED (60.22, -5.16, -0.06).
+[INFO] [1780734335.396283875] [microamp_factor_graph_tracking]: Added ROV 1 node (step 49) at t=1700000285.00, dt=5.000 s
+[INFO] [1780734335.402750250] [microamp_factor_graph_tracking]: Processed GNSS at 1700000286.00, NED (59.68, -6.88, 0.90).
+[INFO] [1780734335.500423916] [microamp_factor_graph_tracking]: Processed GNSS at 1700000287.00, NED (59.34, -8.16, 0.36).
+[INFO] [1780734335.601429083] [microamp_factor_graph_tracking]: Processed GNSS at 1700000288.00, NED (58.53, -10.60, 0.23).
+[INFO] [1780734335.698135666] [microamp_factor_graph_tracking]: Processed GNSS at 1700000289.00, NED (58.61, -12.33, 0.02).
+[INFO] [1780734335.812935833] [microamp_factor_graph_tracking]: Processed GNSS at 1700000290.00, NED (58.20, -13.76, -0.82).
+[INFO] [1780734335.896355375] [microamp_factor_graph_tracking]: Added ROV 1 node (step 50) at t=1700000290.00, dt=5.000 s
+[INFO] [1780734335.901715208] [microamp_factor_graph_tracking]: Processed GNSS at 1700000291.00, NED (57.16, -15.30, 0.38).
+[INFO] [1780734336.000355833] [microamp_factor_graph_tracking]: Processed GNSS at 1700000292.00, NED (57.21, -16.03, 0.65).
+[INFO] [1780734336.101047167] [microamp_factor_graph_tracking]: Processed GNSS at 1700000293.00, NED (56.49, -17.15, -0.13).
+[INFO] [1780734336.201954542] [microamp_factor_graph_tracking]: Processed GNSS at 1700000294.00, NED (55.44, -18.61, 0.44).
+[INFO] [1780734336.324246083] [microamp_factor_graph_tracking]: Processed GNSS at 1700000295.00, NED (54.78, -19.43, 0.31).
+[INFO] [1780734336.396391958] [microamp_factor_graph_tracking]: Added ROV 1 node (step 51) at t=1700000295.00, dt=5.000 s
+[INFO] [1780734336.402346292] [microamp_factor_graph_tracking]: Processed GNSS at 1700000296.00, NED (53.70, -19.71, 0.37).
+[INFO] [1780734336.503864167] [microamp_factor_graph_tracking]: Processed GNSS at 1700000297.00, NED (52.94, -20.48, -0.36).
+[INFO] [1780734336.607000584] [microamp_factor_graph_tracking]: Processed GNSS at 1700000298.00, NED (51.09, -20.41, 0.17).
+[INFO] [1780734336.702811459] [microamp_factor_graph_tracking]: Processed GNSS at 1700000299.00, NED (50.11, -19.99, -0.29).
+[INFO] [1780734338.186044876] [rclcpp]: signal_handler(SIGINT/SIGTERM)

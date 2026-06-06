@@ -1,2 +1,0 @@
-scenario_id,scenario_name,rov_est_csv,asv_est_csv,plot_dir
-1,FGO - Scenario 1: Bearing-only,/ros2_ws/microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/results/exp1_noise_sweep_joined_stats/sigma_0.02/scenario1/estimated_data/rov_estimated_s1.csv,/ros2_ws/microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/results/exp1_noise_sweep_joined_stats/sigma_0.02/scenario1/estimated_data/boat_estimated_s1.csv,/ros2_ws/microampere_ros2ws/src/microamp_fgo_rov_tracking/post_processing/results/exp1_noise_sweep_joined_stats/sigma_0.02/scenario1/plots

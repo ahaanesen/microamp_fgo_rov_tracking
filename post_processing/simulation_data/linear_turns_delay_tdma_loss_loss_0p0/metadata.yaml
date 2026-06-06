@@ -1,0 +1,38 @@
+rosbag2_bagfile_information:
+  version: 5
+  storage_identifier: mcap
+  duration:
+    nanoseconds: 299990000128
+  starting_time:
+    nanoseconds_since_epoch: 1700000000000000000
+  message_count: 30360
+  topics_with_message_count:
+    - topic_metadata:
+        name: microampere/sensors/usbl
+        type: blueboat_interfaces/msg/USBL
+        serialization_format: cdr
+        offered_qos_profiles: ""
+      message_count: 60
+    - topic_metadata:
+        name: microampere/gnss/nav_pvt
+        type: blueboat_interfaces/msg/GNSSNavPvt
+        serialization_format: cdr
+        offered_qos_profiles: ""
+      message_count: 300
+    - topic_metadata:
+        name: microampere/imu/data
+        type: sensor_msgs/msg/Imu
+        serialization_format: cdr
+        offered_qos_profiles: ""
+      message_count: 30000
+  compression_format: ""
+  compression_mode: ""
+  relative_file_paths:
+    - linear_turns_delay_tdma_loss_loss_0p0_0.mcap
+  files:
+    - path: linear_turns_delay_tdma_loss_loss_0p0_0.mcap
+      starting_time:
+        nanoseconds_since_epoch: 1700000000000000000
+      duration:
+        nanoseconds: 299990000128
+      message_count: 30360

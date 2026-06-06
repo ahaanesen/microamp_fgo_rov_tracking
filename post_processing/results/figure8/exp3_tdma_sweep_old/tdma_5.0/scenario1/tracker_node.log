@@ -1,0 +1,17 @@
+[37;1m2026-06-03 15:50:30.496 [31;1m[[37;1mRTPS_TRANSPORT_SHM[31;1m Error] [37mFailed init_port fastrtps_port7419: open_and_lock_file failed[34;1m -> Function [36mopen_port_internal[m
+[INFO] [1780501830.529306377] [microamp_factor_graph_tracking]: Using scenario_id=1
+[INFO] [1780501830.540381169] [microamp_factor_graph_tracking]: Expanded factor graph node initialized.
+[INFO] [1780501832.834318920] [microamp_factor_graph_tracking]: Graph initialized with GNSS at NED (31.16, 2.26, -0.89)
+[INFO] [1780501832.836029962] [microamp_factor_graph_tracking]: IMU initialized at time 1700000001.110
+[INFO] [1780501832.919655087] [microamp_factor_graph_tracking]: Initialized ROV 1 at NED (34.23, 8.63, 7.32), t_sent=1700000000.00
+terminate called after throwing an instance of 'gtsam::IndeterminantLinearSystemException'
+  what():  
+Indeterminant linear system detected while working near variable
+8646911284551352320 (Symbol: x0).
+
+Thrown when a linear system is ill-posed.  The most common cause for this
+error is having underconstrained variables.  Mathematically, the system is
+underdetermined.  See the GTSAM Doxygen documentation at
+http://borg.cc.gatech.edu/ on gtsam::IndeterminantLinearSystemException for
+more information.
+[ros2run]: Aborted
