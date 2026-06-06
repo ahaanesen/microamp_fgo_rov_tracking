@@ -20,10 +20,23 @@ PACKAGE_ROOT = SCRIPT_DIR.parent
 WORKSPACE_ROOT = PACKAGE_ROOT.parent.parent
 RUN_SCRIPT = SCRIPT_DIR / "run_all_scenarios.py"
 
+# TRAJECTORY_NAME = "figure8"
+TRAJECTORY_NAME = "linear_turns" 
+
+# linear_turns_init :init_with_gt: true
+#       asv_init_pos_gt: [0.0015000063806974678,0.0,0.0]  # ASV ground truth position
+#       asv_init_vel_gt: [1.5,0.0,0.0]  # ASV ground truth velocity
+#       asv_init_yaw_gt: 0.0  # ASV ground truth yaw (radians)
+#       rov_init_pos_gt: [200.0,100.0,8.0]  # ROV ground truth position
+#       rov_init_vel_gt: [-0.00016874998358673565,0.2249999358749477,0.07199998686715503]
+#       rov_initial_range_guess:  223.749 # initial guess on range from ASV to ROV [m]
+
+
 DEFAULT_DATASET = (
-  PACKAGE_ROOT / "post_processing" / "simulation_data" / "figure8_delay_no_loss_tdma_slot_5p0"
+  PACKAGE_ROOT / "post_processing" / "simulation_data" / f"{TRAJECTORY_NAME}_delay_no_loss_tdma_slot_5p0"
 )
-DEFAULT_OUTPUT_ROOT = PACKAGE_ROOT / "post_processing" / "results" / "exp1_noise_sweep_joined_stats"
+print(f"Default dataset: {DEFAULT_DATASET}")
+DEFAULT_OUTPUT_ROOT = PACKAGE_ROOT/"post_processing"/"results"/f"{TRAJECTORY_NAME}"/"exp1_noise_sweep"
 
 SIGMA_VALUES = [0.005, 0.01, 0.02, 0.05, 0.1, 0.5, 1.0]
 
@@ -31,24 +44,50 @@ SIGMA_VALUES = [0.005, 0.01, 0.02, 0.05, 0.1, 0.5, 1.0]
 def _run_scenario(dataset_dir: Path, output_root: Path, sigma: float, startup_delay: float) -> Path:
   run_name = f"sigma_{sigma}"
   run_root = output_root / run_name
-  cmd = [
-    sys.executable,
-    str(RUN_SCRIPT),
-    "--chosen-scenarios",
-    "1",
-    "--dataset-dir",
-    str(dataset_dir),
-    "--output-root",
-    str(output_root),
-    "--run-name",
-    run_name,
-    "--startup-delay",
-    str(startup_delay),
-    "--fgo-params",
-    f"rov_cv_continous_sigma={sigma}",
-    "init_with_gt=true",
-  ]
-  subprocess.run(cmd, check=True, cwd=WORKSPACE_ROOT)
+  if TRAJECTORY_NAME == "figure8":
+    cmd = [
+      sys.executable,
+      str(RUN_SCRIPT),
+      "--chosen-scenarios",
+      "1",
+      "--dataset-dir",
+      str(dataset_dir),
+      "--output-root",
+      str(output_root),
+      "--run-name",
+      run_name,
+      "--startup-delay",
+      str(startup_delay),
+      "--fgo-params",
+      f"rov_cv_continous_sigma={sigma}",
+      "init_with_gt=true",
+    ]
+    subprocess.run(cmd, check=True, cwd=WORKSPACE_ROOT)
+  elif TRAJECTORY_NAME == "linear_turns":
+    cmd = [
+      sys.executable,
+      str(RUN_SCRIPT),
+      "--chosen-scenarios",
+      "1",
+      "--dataset-dir",
+      str(dataset_dir),
+      "--output-root",
+      str(output_root),
+      "--run-name",
+      run_name,
+      "--startup-delay",
+      str(startup_delay),
+      "--fgo-params",
+      f"rov_cv_continous_sigma={sigma}",
+      "init_with_gt=true",
+      "asv_init_pos_gt=[0.0015000063806974678,0.0,0.0]",
+      "asv_init_vel_gt=[1.5,0.0,0.0]",
+      "asv_init_yaw_gt=0.0",
+      "rov_init_pos_gt=[200.0,100.0,8.0]",
+      "rov_init_vel_gt=[-0.00016874998358673565,0.2249999358749477,0.07199998686715503]",
+      "rov_initial_range_guess=223.749",
+    ]
+    subprocess.run(cmd, check=True, cwd=WORKSPACE_ROOT)
   return run_root
 
 
@@ -108,6 +147,7 @@ def _build_result_row(
 
 def main() -> int:
   parser = argparse.ArgumentParser(description="Experiment 1: ROV CV sigma sweep")
+  parser.add_argument("trajectory", choices=["figure8", "linear_turns"], default="figure8", help="Trajectory to analyze")
   parser.add_argument("--dataset-dir", default=str(DEFAULT_DATASET))
   parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
   parser.add_argument("--startup-delay", type=float, default=2.0)
@@ -123,7 +163,7 @@ def main() -> int:
   rows = []
   for sigma in SIGMA_VALUES:
     print(f"Running sigma={sigma}...", flush=True)
-    # run_root = _run_scenario(dataset_dir, output_root, sigma, args.startup_delay)
+    run_root = _run_scenario(dataset_dir, output_root, sigma, args.startup_delay)
     run_name = f"sigma_{sigma}"
     run_root = output_root / run_name
     # stats = _load_stats(run_root)

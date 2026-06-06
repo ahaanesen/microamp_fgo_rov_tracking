@@ -189,15 +189,31 @@ def make_env() -> dict[str, str]:
     return env
 
 
-def start_process(cmd: list[str], env: dict[str, str], cwd: Path) -> subprocess.Popen:
+def start_process(
+    cmd: list[str],
+    env: dict[str, str],
+    cwd: Path,
+    stdout_handle: object | None = None,
+) -> subprocess.Popen:
     return subprocess.Popen(
         cmd,
         cwd=cwd,
         env=env,
-        stdout=subprocess.DEVNULL,
+        stdout=stdout_handle or subprocess.DEVNULL,
         stderr=subprocess.STDOUT,
         preexec_fn=os.setsid,
     )
+
+
+def tail_file(path: Path, max_lines: int = 50) -> str:
+    if not path.exists():
+        return "(log file missing)"
+    try:
+        lines = path.read_text(errors="replace").splitlines()
+    except Exception as exc:
+        return f"(failed to read log: {exc})"
+    tail = lines[-max_lines:]
+    return "\n".join(tail) if tail else "(log file empty)"
 
 
 def stop_process(proc: subprocess.Popen | None, timeout: float = 10.0) -> None:
@@ -275,16 +291,40 @@ def run_single_scenario(
     tracker_proc = None
     logger_proc = None
     bag_proc = None
+    tracker_log = scenario_dir / "tracker_node.log"
+    logger_log = scenario_dir / "csv_logger.log"
+    tracker_log_handle = None
+    logger_log_handle = None
 
     try:
-        tracker_proc = start_process(tracker_cmd, env, PACKAGE_ROOT.parent.parent)
-        logger_proc = start_process(logger_cmd, env, PACKAGE_ROOT.parent.parent)
+        tracker_log_handle = tracker_log.open("w", encoding="utf-8")
+        logger_log_handle = logger_log.open("w", encoding="utf-8")
+        tracker_proc = start_process(
+            tracker_cmd,
+            env,
+            PACKAGE_ROOT.parent.parent,
+            stdout_handle=tracker_log_handle,
+        )
+        logger_proc = start_process(
+            logger_cmd,
+            env,
+            PACKAGE_ROOT.parent.parent,
+            stdout_handle=logger_log_handle,
+        )
         time.sleep(startup_delay)
 
         if tracker_proc.poll() is not None:
-            raise RuntimeError(f"Tracker node exited early with code {tracker_proc.returncode}")
+            log_tail = tail_file(tracker_log)
+            raise RuntimeError(
+                "Tracker node exited early with code "
+                f"{tracker_proc.returncode}. Log: {tracker_log}\n{log_tail}"
+            )
         if logger_proc.poll() is not None:
-            raise RuntimeError(f"CSV logger exited early with code {logger_proc.returncode}")
+            log_tail = tail_file(logger_log)
+            raise RuntimeError(
+                "CSV logger exited early with code "
+                f"{logger_proc.returncode}. Log: {logger_log}\n{log_tail}"
+            )
 
         bag_proc = start_process(bag_cmd, env, PACKAGE_ROOT.parent.parent)
         wait_for_process(bag_proc, f"ros2 bag play for scenario {scenario_id}")
@@ -292,6 +332,10 @@ def run_single_scenario(
     finally:
         stop_process(logger_proc)
         stop_process(tracker_proc)
+        if tracker_log_handle:
+            tracker_log_handle.close()
+        if logger_log_handle:
+            logger_log_handle.close()
 
     rov_est_csv = csv_dir / f"rov_estimated_{run_name}.csv"
     asv_est_csv = csv_dir / f"boat_estimated_{run_name}.csv"

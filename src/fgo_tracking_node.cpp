@@ -150,6 +150,7 @@ void FactorGraphTrackingNode::imuCallback(const Imu::SharedPtr msg) {
   if (!imu_initialised_) {
     last_imu_time_ = stamp;
     imu_initialised_ = true;
+    RCLCPP_INFO(get_logger(), "IMU initialized at time %.3f", last_imu_time_.seconds());
     return;
   }
 
