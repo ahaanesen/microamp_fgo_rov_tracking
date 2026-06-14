@@ -225,10 +225,11 @@ def _chi2_panel(ax, t, values, color, title):
 # Error statistics
 # ============================================================
 
-def _error_statistics(gt_xyz, est_xyz):
+def _error_statistics(gt_xyz, est_xyz, cov6=None):
     valid = _valid_rows(gt_xyz, est_xyz)
     gt_xyz = gt_xyz[valid]
     est_xyz = est_xyz[valid]
+    cov6 = cov6[valid] if cov6 is not None and len(cov6) == len(valid) else None
 
     if len(gt_xyz) == 0:
         return {
@@ -256,27 +257,11 @@ def _error_statistics(gt_xyz, est_xyz):
     path_length_gt = _path_length(gt_xyz)
     path_length_est = _path_length(est_xyz)
 
-    nees_pos_vals, nees_vel_vals = [], []
-    # Estimate position covariance from residuals (sample covariance) and
-    # compute per-sample NEES = e.T @ P^{-1} @ e. Use pseudo-inverse if needed.
-    try:
-        if len(err) > 0:
-            # sample covariance (unbiased)
-            P = np.cov(err, rowvar=False, bias=False)
-            # ensure shape (3,3)
-            if P.shape == (3, 3) and np.all(np.isfinite(P)):
-                try:
-                    Pinv = np.linalg.inv(P)
-                except np.linalg.LinAlgError:
-                    Pinv = np.linalg.pinv(P)
-                for k in range(len(err)):
-                    e = err[k]
-                    try:
-                        nees_pos_vals.append(float(e @ Pinv @ e))
-                    except Exception:
-                        nees_pos_vals.append(np.nan)
-    except Exception:
-        nees_pos_vals = []
+    if _cov6_has_data(cov6):
+        nees_pos = _compute_nees(err, cov6)
+        mean_nees_pos = float(np.nanmean(nees_pos))
+    else:
+        mean_nees_pos = np.nan
 
     if path_length_gt > 0:
         path_length_error_pct = 100.0 * abs(path_length_est - path_length_gt) / path_length_gt
@@ -291,8 +276,8 @@ def _error_statistics(gt_xyz, est_xyz):
         "max_error": float(np.max(pos_err)),
         "final_error": float(pos_err[-1]),
         "ate_rms": float(np.sqrt(np.mean(pos_err**2))),
-        "mean_tanees_pos": float(np.nanmean(nees_pos_vals)) if len(nees_pos_vals) > 0 else np.nan,
-        "mean_tanees_vel": float(np.nanmean(nees_vel_vals)) if len(nees_vel_vals) > 0 else np.nan,
+        "mean_tanees_pos": mean_nees_pos,
+        "mean_tanees_vel": np.nan,
         # "mean_abs_n": float(np.mean(np.abs(err[:, 0]))),
         # "mean_abs_e": float(np.mean(np.abs(err[:, 1]))),
         # "mean_abs_d": float(np.mean(np.abs(err[:, 2]))),
@@ -583,11 +568,11 @@ class PlotterCSVJoint:
         rows = []
 
         if self._rov_available:
-            rov_stats = _error_statistics(self.rov_gt_eval, self.rov_est_i)
+            rov_stats = _error_statistics(self.rov_gt_eval, self.rov_est_i, self.rov_cov6_i)
             rov_stats.update({"scenario": self.scenario_name, "platform": "ROV"})
             rows.append(rov_stats)
 
-        asv_stats = _error_statistics(self.asv_gt_eval, self.asv_est_i)
+        asv_stats = _error_statistics(self.asv_gt_eval, self.asv_est_i, self.asv_cov6_i)
         asv_stats.update({"scenario": self.scenario_name, "platform": "ASV"})
         rows.append(asv_stats)
 

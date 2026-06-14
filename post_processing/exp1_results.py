@@ -36,7 +36,7 @@ DEFAULT_DATASET = (
   PACKAGE_ROOT / "post_processing" / "simulation_data" / f"{TRAJECTORY_NAME}_delay_no_loss_tdma_slot_5p0"
 )
 print(f"Default dataset: {DEFAULT_DATASET}")
-DEFAULT_OUTPUT_ROOT = PACKAGE_ROOT/"post_processing"/"results"/f"{TRAJECTORY_NAME}"/"exp1_noise_sweep"
+DEFAULT_OUTPUT_ROOT = PACKAGE_ROOT/"post_processing"/"results"/f"{TRAJECTORY_NAME}"/"exp1_noise_sweep2"
 
 SIGMA_VALUES = [0.005, 0.01, 0.02, 0.05, 0.1, 0.5, 1.0]
 
@@ -147,7 +147,7 @@ def _build_result_row(
 
 def main() -> int:
   parser = argparse.ArgumentParser(description="Experiment 1: ROV CV sigma sweep")
-  parser.add_argument("trajectory", choices=["figure8", "linear_turns"], default="figure8", help="Trajectory to analyze")
+  # parser.add_argument("trajectory", choices=["figure8", "linear_turns"], default="figure8", help="Trajectory to analyze")
   parser.add_argument("--dataset-dir", default=str(DEFAULT_DATASET))
   parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
   parser.add_argument("--startup-delay", type=float, default=2.0)
@@ -156,6 +156,8 @@ def main() -> int:
   parser.add_argument("--experiment", default="exp1_noise_sweep")
   parser.add_argument("--divergence-threshold", type=float, default=10.0)
   args = parser.parse_args()
+
+  trajectory = TRAJECTORY_NAME
 
   dataset_dir = Path(args.dataset_dir).resolve()
   output_root = Path(args.output_root).resolve()
